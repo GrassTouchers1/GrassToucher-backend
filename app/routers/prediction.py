@@ -9,29 +9,18 @@ import logging
 from typing import Optional
 from pathlib import Path
 import numpy as np
-import joblib
 from fastapi import APIRouter
-from ..db import pool
+from grasstoucher_core.ai.prediction_engine import get_prediction_engine, get_point_slope_factor
+from ..db import pool, get_db_connection
 from .flood_points import DEFAULT_FLOOD_POINTS
 from .weather import get_hanoi_weather
 
 log = logging.getLogger("floodnav.prediction")
 router = APIRouter(prefix="/api/predictions", tags=["Dự báo AI"])
 
-AI_DIR = Path(__file__).resolve().parent.parent / "ai"
-MODEL_30_PATH = AI_DIR / "model_30m.joblib"
-MODEL_60_PATH = AI_DIR / "model_60m.joblib"
-
-_model_30m = None
-_model_60m = None
-
 def get_models():
-    global _model_30m, _model_60m
-    if _model_30m is None and MODEL_30_PATH.exists():
-        _model_30m = joblib.load(MODEL_30_PATH)
-    if _model_60m is None and MODEL_60_PATH.exists():
-        _model_60m = joblib.load(MODEL_60_PATH)
-    return _model_30m, _model_60m
+    engine = get_prediction_engine()
+    return engine.model_30m, engine.model_60m
 
 def get_open_meteo_rainfall() -> tuple[float, float]:
     """
@@ -141,7 +130,7 @@ def get_ai_predictions(rainfall_mm: Optional[float] = None):
 
     points = []
     try:
-        with pool.connection(timeout=3.0) as conn:
+        with get_db_connection() as conn:
             points = conn.execute("""
                 SELECT fp.id, fp.name, fp.threshold_cm, COALESCE(r.depth_cm, 0) as current_depth
                 FROM flood_points fp

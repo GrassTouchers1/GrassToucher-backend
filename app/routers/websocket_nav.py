@@ -104,6 +104,14 @@ class ConnectionManager:
             await self.active_connections[session_id].send_json(message)
 
     async def broadcast(self, message: dict):
+        """Phát sóng thông điệp tới tất cả các client đang kết nối WebSocket (cảnh báo thiên tai, SOS)."""
+        for sid, ws in list(self.active_connections.items()):
+            try:
+                await ws.send_json(message)
+            except Exception:
+                pass
+
+    async def broadcast(self, message: dict):
         """Phát thông báo tới toàn bộ các xe đang lưu thông trên hệ thống."""
         for session_id, connection in list(self.active_connections.items()):
             try:
@@ -308,6 +316,12 @@ def check_route_and_reroute(session: NavSession) -> dict:
                 f"ngập sâu {hazard['depth_cm']} cm và mọi hướng đi vòng đều bị ngập chặn đối với loại xe này."
             )
         }
+
+
+@router.websocket("/ws/navigation")
+async def navigation_websocket_default(websocket: WebSocket, session_id: Optional[str] = None):
+    sid = session_id or "default_session"
+    await navigation_websocket(websocket, sid)
 
 
 @router.websocket("/ws/navigation/{session_id}")

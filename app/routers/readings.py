@@ -5,7 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from ..db import pool
+from ..db import pool, get_db_connection
 from ..schemas import ReadingCreate
 from .flood_points import DEFAULT_FLOOD_POINTS
 from ..fallback_storage import save_fallback_reading, get_fallback_readings
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/readings", tags=["Số đo mực nước"])
 def create_reading(body: ReadingCreate):
     """Cảm biến (hoặc script giả lập) gửi mực nước. Có thể dùng point_id hoặc sensor_id."""
     try:
-        with pool.connection(timeout=3.0) as conn:
+        with get_db_connection() as conn:
             if body.point_id is not None:
                 point = conn.execute(
                     "SELECT id, threshold_cm FROM flood_points WHERE id = %s", (body.point_id,)
@@ -99,7 +99,7 @@ def list_readings(
         sql += " ORDER BY recorded_at DESC LIMIT %s"
         params.append(limit)
 
-        with pool.connection(timeout=3.0) as conn:
+        with get_db_connection() as conn:
             rows = conn.execute(sql, params).fetchall()
         for r in rows:
             r["depth_cm"] = float(r["depth_cm"])

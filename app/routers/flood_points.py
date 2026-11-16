@@ -7,7 +7,7 @@ import psycopg
 from fastapi import APIRouter, HTTPException, Response
 
 from .. import config
-from ..db import pool
+from ..db import pool, get_db_connection
 from ..schemas import FloodPointCreate, FloodPointUpdate
 from ..fallback_storage import get_latest_readings_map
 
@@ -488,7 +488,7 @@ def _get_or_404(point_id: int) -> dict:
 
     try:
 
-        with pool.connection(timeout=3.0) as conn:
+        with get_db_connection() as conn:
 
             row = conn.execute(SELECT_SQL + " WHERE fp.id = %s", (point_id,)).fetchone()
 
@@ -521,7 +521,7 @@ def list_flood_points():
 
     try:
 
-        with pool.connection(timeout=3.0) as conn:
+        with get_db_connection() as conn:
 
             rows = conn.execute(SELECT_SQL + " ORDER BY fp.id").fetchall()
 
@@ -552,7 +552,7 @@ SELECT id, (ARRAY[
 def reset_flood_points():
     """Khôi phục dữ liệu mực nước của 130 trạm về dữ liệu mẫu chuẩn ban đầu trong CSDL."""
     try:
-        with pool.connection(timeout=3.0) as conn:
+        with get_db_connection() as conn:
             conn.execute(SEED_READINGS_SQL)
             rows = conn.execute(SELECT_SQL + " ORDER BY fp.id").fetchall()
         return {"type": "FeatureCollection", "features": [_to_feature(r) for r in rows]}
@@ -577,7 +577,7 @@ def create_flood_point(body: FloodPointCreate):
 
     try:
 
-        with pool.connection(timeout=3.0) as conn:
+        with get_db_connection() as conn:
 
             new_id = conn.execute(
 
@@ -649,7 +649,7 @@ def update_flood_point(point_id: int, body: FloodPointUpdate):
 
     try:
 
-        with pool.connection(timeout=3.0) as conn:
+        with get_db_connection() as conn:
 
             res = conn.execute(sql, tuple(params))
 
@@ -673,7 +673,7 @@ def delete_flood_point(point_id: int):
 
     try:
 
-        with pool.connection(timeout=3.0) as conn:
+        with get_db_connection() as conn:
 
             res = conn.execute("DELETE FROM flood_points WHERE id = %s", (point_id,))
 

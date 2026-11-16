@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 import logging
 from fastapi import APIRouter, HTTPException, Response
 
-from ..db import pool
+from ..db import pool, get_db_connection
 from ..schemas import ReportClear, ReportCreate
 from ..fallback_storage import (
     save_fallback_report,
@@ -34,7 +34,7 @@ POINT = "ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography"
 @router.post("", status_code=201)
 def create_report(body: ReportCreate):
     try:
-        with pool.connection(timeout=3.0) as conn:
+        with get_db_connection() as conn:
             rep = conn.execute(
                 """INSERT INTO reports (user_id, geom, level, photo_url)
                    VALUES (%s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), %s::report_level, %s)
@@ -114,7 +114,7 @@ def list_reports(only_confirmed: bool = False):
             sql += " AND confirmed"
         sql += " ORDER BY created_at DESC"
 
-        with pool.connection(timeout=3.0) as conn:
+        with get_db_connection() as conn:
             rows = conn.execute(sql).fetchall()
 
         return {
@@ -163,7 +163,7 @@ def list_reports(only_confirmed: bool = False):
 def clear_reports(body: ReportClear):
     """Người dân báo 'đã hết ngập': hết hạn mọi báo cáo còn hiệu lực trong bán kính 100 m."""
     try:
-        with pool.connection(timeout=3.0) as conn:
+        with get_db_connection() as conn:
             rows = conn.execute(
                 f"""UPDATE reports SET expires_at = now()
                     WHERE expires_at > now()
@@ -180,7 +180,7 @@ def clear_reports(body: ReportClear):
 @router.delete("/{report_id}", status_code=204)
 def delete_report(report_id: int):
     try:
-        with pool.connection(timeout=3.0) as conn:
+        with get_db_connection() as conn:
             row = conn.execute("DELETE FROM reports WHERE id = %s RETURNING id", (report_id,)).fetchone()
         if row is None:
             raise HTTPException(404, f"Không tìm thấy báo cáo id={report_id}")

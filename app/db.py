@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -40,7 +41,7 @@ def is_db_available() -> bool:
         return False
 
     try:
-        with pool.connection(timeout=0.4) as conn:
+        with pool.connection(timeout=0.3) as conn:
             conn.execute("SELECT 1")
             _db_online_status = True
             _last_check_time = now
@@ -49,3 +50,16 @@ def is_db_available() -> bool:
         _db_online_status = False
         _last_check_time = now
         return False
+
+
+@contextmanager
+def get_db_connection(timeout: float = 0.5):
+    """
+    Context manager an toàn: kiểm tra circuit breaker trước khi lấy kết nối.
+    Nếu DB offline, ném ConnectionError ngay lập tức (0.01ms) để kích hoạt fallback,
+    không gây nghẽn 3 giây cho người dùng.
+    """
+    if not is_db_available():
+        raise ConnectionError("PostgreSQL database is currently offline (Circuit breaker active).")
+    with pool.connection(timeout=timeout) as conn:
+        yield conn

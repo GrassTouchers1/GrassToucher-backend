@@ -64,3 +64,52 @@ class RouteRequest(BaseModel):
     destination: LngLat
     vehicle: Literal["motorbike", "car"] = "motorbike"
     use_ai_prediction: bool = False
+
+
+# ==========================================
+# NORTHSTAR MULTI-HAZARD & DISASTER SCHEMAS
+# ==========================================
+
+class DisasterCreate(BaseModel):
+    title: str = Field(min_length=2, max_length=150)
+    hazard_type: Literal["flood", "landslide", "storm", "heavy_rain", "flash_flood", "other"] = "flood"
+    severity: Literal["low", "medium", "high", "critical"] = "medium"
+    status: Literal["warning", "active", "receding", "resolved"] = "active"
+    description: Optional[str] = Field(default=None, max_length=500)
+    lng: float = Field(ge=-180, le=180)
+    lat: float = Field(ge=-90, le=90)
+    radius_m: float = Field(default=150.0, ge=10.0, le=50000.0)
+
+
+class ShelterCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=150)
+    address: Optional[str] = Field(default=None, max_length=250)
+    lng: float = Field(ge=-180, le=180)
+    lat: float = Field(ge=-90, le=90)
+    capacity: int = Field(default=200, ge=1, le=50000)
+    current_occupancy: int = Field(default=0, ge=0)
+    contact_phone: Optional[str] = Field(default=None, max_length=30)
+    supplies_status: Optional[str] = Field(default="Sẵn sàng (Lương thực & Y tế)", max_length=120)
+    status: Literal["open", "full", "closed"] = "open"
+
+
+class SOSCreate(BaseModel):
+    contact_name: str = Field(min_length=1, max_length=100)
+    phone: str = Field(min_length=8, max_length=20)
+    lng: float = Field(ge=-180, le=180)
+    lat: float = Field(ge=-90, le=90)
+    people_count: int = Field(default=1, ge=1, le=100)
+    has_elderly_or_children: bool = False
+    water_level_cm: float = Field(default=0.0, ge=0.0, le=500.0)
+    priority: Literal["low", "medium", "high", "critical"] = "high"
+    notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class SOSStatusUpdate(BaseModel):
+    status: Literal["pending", "acknowledged", "dispatched", "rescued", "cancelled"]
+
+
+class EvacuationRouteRequest(BaseModel):
+    origin: LngLat
+    vehicle: Literal["walk", "motorbike", "car"] = "walk"
+

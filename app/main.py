@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from .db import pool
+from .db import pool, get_db_connection
 from .routers import (
     flood_points,
     graph_info,
@@ -14,10 +14,18 @@ from .routers import (
     route,
     weather,
     prediction,
-    websocket_nav
+    websocket_nav,
+    disasters,
+    shelters,
+    sos,
+    evacuation,
 )
 
-app = FastAPI(title="FloodNav API", version="0.4.0")
+app = FastAPI(
+    title="NorthStar / FloodNav API",
+    version="1.0.0",
+    description="Vietnam Disaster Intelligence & Multi-Hazard Emergency Response Ecosystem"
+)
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 if STATIC_DIR.exists():
@@ -39,6 +47,10 @@ app.include_router(route.router)
 app.include_router(weather.router)
 app.include_router(prediction.router)
 app.include_router(websocket_nav.router)
+app.include_router(disasters.router)
+app.include_router(shelters.router)
+app.include_router(sos.router)
+app.include_router(evacuation.router)
 
 
 @app.get("/", include_in_schema=False)
@@ -61,7 +73,7 @@ def home():
 def health():
     """Kiểm tra backend + DB + PostGIS đã sống chưa."""
     try:
-        with pool.connection(timeout=3.0) as conn:
+        with get_db_connection(timeout=0.5) as conn:
             row = conn.execute("SELECT PostGIS_Version() AS postgis").fetchone()
         return {"status": "ok", "postgis": row["postgis"], "database": "connected"}
     except Exception as e:
