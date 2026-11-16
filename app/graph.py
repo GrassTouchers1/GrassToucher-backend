@@ -1,0 +1,209 @@
+"""Nạp đồ thị OSM một lần, ghép điểm ngập (từ DB) vào các đoạn đường gần đó."""
+import logging
+import math
+import threading
+
+import geopandas as gpd
+import numpy as np
+import osmnx as ox
+from shapely.geometry import Point
+
+from . import config
+from .db import pool, is_db_available
+
+log = logging.getLogger("floodnav.graph")
+_lock = threading.Lock()
+_graph = None
+
+
+class GraphNotReady(Exception):
+    pass
+
+
+class RoadGraph:
+    def __init__(self, G):
+        self.G = G
+        ids = list(G.nodes)
+        self.node_ids = np.array(ids)
+        self.node_lng = np.array([G.nodes[n]["x"] for n in ids])
+        self.node_lat = np.array([G.nodes[n]["y"] for n in ids])
+
+        edges = ox.graph_to_gdfs(G, nodes=False)
+        self.edge_keys = [(int(u), int(v), int(k)) for u, v, k in edges.index]
+        self.edges_m = edges.to_crs(config.METRIC_CRS)
+        self.edges_m.sindex      # dựng chỉ mục không gian trước
+
+    def nearest_node(self, lng: float, lat: float):
+        """Nút giao gần nhất và khoảng cách (m)."""
+        k = math.cos(math.radians(lat))
+        d2 = ((self.node_lng - lng) * k) ** 2 + (self.node_lat - lat) ** 2
+        i = int(d2.argmin())
+        return int(self.node_ids[i]), math.sqrt(float(d2[i])) * 111_320
+
+    def snap_to_edge(self, lng: float, lat: float):
+        """
+        Tìm cạnh (đoạn đường / ngõ) gần nhất và vị trí tiếp cận chính xác trên mặt đường:
+        - Sử dụng R-tree spatial index (self.edges_m.sindex) trong hệ toạ độ mét.
+        - Chiếu điểm lên cạnh để lấy toạ độ tiếp cận thực tế (projected point) và hai nút giao đầu mút.
+        """
+        try:
+            pt_m = gpd.GeoSeries([Point(lng, lat)], crs=4326).to_crs(config.METRIC_CRS)[0]
+            hits = self.edges_m.sindex.nearest(pt_m)
+            edge_idx = int(hits[1][0]) if len(hits) == 2 else int(hits[0])
+            edge_row = self.edges_m.iloc[edge_idx]
+            u, v, k = self.edge_keys[edge_idx]
+            dist_m = float(edge_row.geometry.distance(pt_m))
+
+            edge_geom_m = edge_row.geometry
+            proj_dist_m = edge_geom_m.project(pt_m)
+            proj_pt_m = edge_geom_m.interpolate(proj_dist_m)
+            proj_pt_4326 = gpd.GeoSeries([proj_pt_m], crs=config.METRIC_CRS).to_crs(4326)[0]
+            proj_pt = [round(float(proj_pt_4326.x), 6), round(float(proj_pt_4326.y), 6)]
+
+            length_m = edge_geom_m.length
+            ratio = (proj_dist_m / length_m) if length_m > 0 else 0.5
+            closer_node = u if ratio < 0.5 else v
+
+            return {
+                "u": u,
+                "v": v,
+                "key": k,
+                "closer_node": closer_node,
+                "dist_m": dist_m,
+                "proj_pt": proj_pt,
+                "ratio": ratio,
+                "name": edge_row.get("name"),
+            }
+        except Exception as e:
+            log.warning("Lỗi snap_to_edge: %s. Dùng fallback nearest_node.", e)
+            n, d = self.nearest_node(lng, lat)
+            node_x = self.G.nodes[n]["x"]
+            node_y = self.G.nodes[n]["y"]
+            return {
+                "u": n,
+                "v": n,
+                "key": 0,
+                "closer_node": n,
+                "dist_m": d,
+                "proj_pt": [round(node_x, 6), round(node_y, 6)],
+                "ratio": 0.0,
+                "name": "Nút giao",
+            }
+
+    def flood_edges(self, sources: list) -> dict:
+        """
+        sources: [{lng, lat, depth_cm, threshold_cm, name, kind, source_id}, ...]
+        Trả về {(u, v, key): thông tin ngập} cho các đoạn đường nằm trong bán kính ảnh hưởng.
+        Đoạn đường chịu nhiều nguồn thì lấy nguồn ngập sâu nhất.
+        """
+        usable = [s for s in sources if s.get("depth_cm") is not None and s["depth_cm"] >= config.PENALTY_START_CM]
+
+        result = {}
+        if not usable:
+            return result
+
+        pts = gpd.GeoSeries(
+            gpd.points_from_xy([s["lng"] for s in usable], [s["lat"] for s in usable]),
+            crs=4326,
+        ).to_crs(config.METRIC_CRS)
+
+        for s, pt in zip(usable, pts):
+            hits = self.edges_m.sindex.query(pt.buffer(config.FLOOD_RADIUS_M), predicate="intersects")
+            for i in hits:
+                key = self.edge_keys[int(i)]
+                cur = result.get(key)
+                if cur is None or s["depth_cm"] > cur["depth_cm"]:
+                    result[key] = {
+                        "depth_cm": s["depth_cm"], "threshold_cm": s["threshold_cm"],
+                        "name": s["name"], "kind": s["kind"], "source_id": s["source_id"],
+                    }
+        return result
+
+
+def get_graph() -> RoadGraph:
+    """Nạp đồ thị ở lần gọi đầu tiên (mất vài giây), các lần sau dùng lại bản trong RAM."""
+    global _graph
+    if _graph is None:
+        with _lock:
+            if _graph is None:
+                if not config.GRAPH_PATH.exists():
+                    raise GraphNotReady(
+                        "Chưa có dữ liệu bản đồ. Hãy chạy: python scripts/download_graph.py")
+                log.info("Đang nạp đồ thị đường từ %s ...", config.GRAPH_PATH)
+                _graph = RoadGraph(ox.load_graphml(config.GRAPH_PATH))
+                log.info("Nạp xong: %d nút, %d đoạn", len(_graph.G.nodes), len(_graph.G.edges))
+    return _graph
+
+
+# ---------------------------------------------------------------- nguồn ngập từ DB
+POINTS_SQL = """
+    SELECT fp.id, fp.name, fp.threshold_cm, ST_X(fp.geom) AS lng, ST_Y(fp.geom) AS lat, r.depth_cm
+    FROM flood_points fp
+    JOIN LATERAL (
+        SELECT depth_cm FROM water_readings
+        WHERE point_id = fp.id ORDER BY recorded_at DESC LIMIT 1
+    ) r ON TRUE
+"""
+
+REPORTS_SQL = """
+    SELECT id, level, ST_X(geom) AS lng, ST_Y(geom) AS lat
+    FROM reports WHERE confirmed AND expires_at > now()
+"""
+
+
+def fetch_flood_sources(use_ai_prediction: bool = False) -> list:
+    """
+    Mực nước hiện tại: số đo mới nhất của mỗi điểm ngập + báo cáo đã xác nhận còn hiệu lực.
+    Nếu use_ai_prediction=True, kết hợp mô hình AI Scikit-learn dự báo 30 phút để chặn đường sớm.
+    """
+    points, reports = [], []
+    if is_db_available():
+        try:
+            with pool.connection(timeout=0.5) as conn:
+                points = conn.execute(POINTS_SQL).fetchall()
+                reports = conn.execute(REPORTS_SQL).fetchall()
+        except Exception as e:
+            log.warning("DB query failed in fetch_flood_sources, using fallback: %s", e)
+            points, reports = [], []
+
+    if not points:
+        from .routers.flood_points import get_fallback_flood_points
+        from .fallback_storage import get_fallback_reports
+        points = get_fallback_flood_points()
+        reports = get_fallback_reports(only_confirmed=True)
+
+    ai_model = None
+    if use_ai_prediction:
+        try:
+            from .routers.prediction import get_models
+            m30, _ = get_models()
+            ai_model = m30
+        except Exception:
+            ai_model = None
+
+    sources = []
+    for p in points:
+        if p.get("depth_cm") is None:
+            continue
+        d = float(p["depth_cm"])
+        predicted_d = d
+        if ai_model is not None and d >= 5.0:
+            try:
+                features = np.array([[d, max(5.0, d * 0.8), max(8.0, d * 1.2), 1.2]])
+                predicted_d = max(d, float(ai_model.predict(features)[0]))
+            except Exception:
+                predicted_d = d
+
+        sources.append({
+            "lng": p["lng"], "lat": p["lat"], "depth_cm": round(predicted_d, 1),
+            "threshold_cm": p["threshold_cm"],
+            "name": p["name"] + (" (Dự báo AI +30p)" if predicted_d > d else ""),
+            "kind": "point", "source_id": p["id"]
+        })
+
+    sources += [
+        {"lng": r["lng"], "lat": r["lat"], "depth_cm": float(config.LEVEL_DEPTH_CM[r["level"]]),
+         "threshold_cm": 20, "name": "Báo cáo của người dân", "kind": "report", "source_id": r["id"]}
+        for r in reports
+    ]
+    return sources
