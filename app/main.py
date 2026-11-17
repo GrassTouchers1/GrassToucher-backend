@@ -19,6 +19,7 @@ from .routers import (
     shelters,
     sos,
     evacuation,
+    data_sources,
 )
 
 app = FastAPI(
@@ -51,6 +52,7 @@ app.include_router(disasters.router)
 app.include_router(shelters.router)
 app.include_router(sos.router)
 app.include_router(evacuation.router)
+app.include_router(data_sources.router)
 
 
 @app.get("/", include_in_schema=False)

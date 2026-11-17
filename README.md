@@ -98,16 +98,26 @@ pip install -r requirements.txt
   ```bash
   alembic upgrade head
   ```
-*(Lưu ý: Nếu không cấu hình PostgreSQL, hệ thống tự động kích hoạt chế độ SQLite / In-Memory Fallback tích hợp sẵn dữ liệu mẫu cho 5 vùng thiên tai, 6 điểm sơ tán và 130 điểm ngập).*
+*(Lưu ý: Nếu không cấu hình PostgreSQL, hệ thống tự động kích hoạt chế độ SQLite / In-Memory Fallback tích hợp sẵn dữ liệu mẫu cho 155 trạm quan trắc, 12 vùng thiên tai trọng điểm, 15 điểm sơ tán và 14 beacon SOS toàn Miền Bắc).*
 
 ### Bước 3: Khởi chạy Server
 ```bash
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
+---
+
+## 🌍 4. Nguồn Dữ liệu Mở & Tính Pháp lý Bản quyền (Open Data Compliance)
+
+Hệ thống cung cấp endpoint tra cứu chuẩn OpenAPI: `GET /api/data-sources` minh bạch danh mục toàn bộ các nguồn dữ liệu mở:
+- **[OpenStreetMap (OSM)](https://www.openstreetmap.org)**: Giấy phép ODbL 1.0 (Open Data) - Mạng lưới giao thông và không gian đô thị.
+- **[Copernicus Data Space (Sentinel-1 SAR)](https://dataspace.copernicus.eu)**: EU Copernicus Open Access Policy - Viễn thám radar vệ tinh xuyên mây bão bóc tách vết ngập bề mặt.
+- **[Trung tâm Dự báo Khí tượng Thủy văn Quốc gia (NCHMF)](https://nchmf.gov.vn)**: Dữ liệu công ích (Nghị định 47/2020/NĐ-CP & Luật Tiếp cận thông tin) - Cấp độ báo động lũ & cảnh báo khẩn cấp.
+- **[Open Development Mekong (ODM)](https://data.vietnam.opendevelopmentmekong.net)**: Giấy phép CC-BY 4.0 - Thủy văn sông ngòi, lưu vực sông Hồng - Thái Bình và hồ chứa thủy điện.
+- **[Open-Meteo Weather API](https://open-meteo.com)**: Giấy phép CC-BY 4.0 - Dự báo lượng mưa thời gian thực.
 
 ---
 
-## 📄 4. Giấy phép Bản quyền (License)
+## 📄 5. Giấy phép Bản quyền (License)
 Phát hành theo giấy phép **Apache License 2.0 (OSI-Approved)**. Xem chi tiết tại [LICENSE](LICENSE).  
 Quy định tham gia đóng góp: [CONTRIBUTING.md](CONTRIBUTING.md).
