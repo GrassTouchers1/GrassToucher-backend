@@ -71,3 +71,131 @@ OPEN_DATA_CATALOG = {
 def get_open_data_sources():
     """Trả về danh mục chi tiết các nguồn dữ liệu mở, cơ sở pháp lý và vai trò trong hệ thống NorthStar."""
     return OPEN_DATA_CATALOG
+
+
+MODELS_ECOSYSTEM = {
+    "system": "NorthStar - Multi-Hazard Advanced Modeling & Computational Ecosystem",
+    "license": "Apache-2.0 (100% Free & Open Source Software)",
+    "independent_of_proprietary_clouds": True,
+    "pillars": [
+        {
+            "pillar_id": 1,
+            "category": "Mô hình Vật lý Khí tượng & Thủy văn (Physics-based Simulation)",
+            "technologies": [
+                {
+                    "name": "WRF (Weather Research and Forecasting)",
+                    "license": "Public Domain",
+                    "role": "Mô phỏng khí tượng số quy mô khu vực (NWP), dự báo bão, mưa lớn và áp thấp nhiệt đới.",
+                    "integration_mode": "Scenario Ingestion (Nạp các trường mưa kịch bản bão lịch sử như bão Yagi)"
+                },
+                {
+                    "name": "ANUGA Hydrodynamic Engine",
+                    "license": "Open Source (Python / 2D SWE)",
+                    "role": "Mô phỏng dòng chảy, độ sâu và vận tốc nước bằng phương trình nước nông 2D (Shallow Water Equations).",
+                    "integration_mode": "Offline Scenario Matrix (Mô phỏng tiền tính toán kịch bản ngập lụt, vỡ đê và lũ quét)"
+                },
+                {
+                    "name": "Deltares SFINCS",
+                    "license": "GPL-3.0",
+                    "role": "Mô phỏng ngập kết hợp đa yếu tố (Compound Flooding: Mưa lớn + Lũ sông + Triều cường ven biển).",
+                    "integration_mode": "Coastal & Riverine Inundation Boundary Export"
+                }
+            ]
+        },
+        {
+            "pillar_id": 2,
+            "category": "Trí tuệ Nhân tạo & Học máy (AI & Machine Learning)",
+            "technologies": [
+                {
+                    "name": "Scikit-Learn (Active in NorthStar Core)",
+                    "license": "BSD-3-Clause",
+                    "role": "Gradient Boosting Regressor dự báo mực nước dâng sau 30/60 phút theo thời gian thực (<5ms).",
+                    "status": "production_active"
+                },
+                {
+                    "name": "LightGBM",
+                    "license": "MIT",
+                    "role": "Gradient Boosting tối ưu tốc độ và dung lượng bộ nhớ cho tập dữ liệu chuỗi thời gian lớn.",
+                    "status": "scalable_alternative"
+                },
+                {
+                    "name": "PyTorch / MMDetection",
+                    "license": "BSD / Apache-2.0",
+                    "role": "Mạng nơ-ron tích chập (U-Net) phân đoạn vết ngập và nhận diện phương tiện, nhà cửa từ ảnh viễn thám.",
+                    "status": "research_offline"
+                }
+            ]
+        },
+        {
+            "pillar_id": 3,
+            "category": "Bản đồ số & Quản lý Địa không gian (GIS Tier)",
+            "technologies": [
+                {
+                    "name": "PostGIS 16 (Active in NorthStar Backend)",
+                    "license": "GPL-2.0+",
+                    "role": "Cơ sở dữ liệu không gian, lập chỉ mục R-Tree (GIST) và xử lý không gian (ST_DWithin, ST_Intersects, ST_Buffer).",
+                    "status": "production_active"
+                },
+                {
+                    "name": "QGIS Desktop",
+                    "license": "GPL-2.0+",
+                    "role": "Biên tập, chuẩn hóa ranh giới hành chính 63 tỉnh thành, mạng lưới lưu vực sông và xuất bản shapefiles.",
+                    "status": "desktop_gis_authoring"
+                },
+                {
+                    "name": "GeoServer",
+                    "license": "GPL-2.0",
+                    "role": "Phân phối các lớp dữ liệu bản đồ ngập lụt diện rộng qua các chuẩn WMS / WFS / WCS.",
+                    "status": "wms_distribution_ready"
+                }
+            ]
+        },
+        {
+            "pillar_id": 4,
+            "category": "Định tuyến Thông minh & Dẫn đường Cứu hộ (Routing Engine)",
+            "technologies": [
+                {
+                    "name": "NorthStar Adaptive A* & Multi-target Dijkstra (Active in Core)",
+                    "license": "Apache-2.0",
+                    "role": "Định tuyến né ngập thích ứng theo loại phương tiện (xe máy 20cm, ô tô 30cm) và sơ tán khẩn cấp đến nơi trú ẩn.",
+                    "status": "production_active"
+                },
+                {
+                    "name": "Valhalla Routing Engine",
+                    "license": "MIT",
+                    "role": "Bộ máy tìm đường C++ hiệu năng cao trên nền OpenStreetMap quy mô toàn quốc.",
+                    "status": "national_scale_roadmap"
+                }
+            ]
+        },
+        {
+            "pillar_id": 5,
+            "category": "Dữ liệu Vệ tinh Viễn thám & Tái phân tích Khí tượng (Observation & Reanalysis)",
+            "technologies": [
+                {
+                    "name": "Copernicus Sentinel-1 SAR",
+                    "license": "EU Copernicus Open Access Policy",
+                    "role": "Ảnh radar vệ tinh băng C xuyên mây bão 24/7 bóc tách vết ngập bề mặt (Water Inundation Mask).",
+                    "status": "active_schema_supported"
+                },
+                {
+                    "name": "NASA GPM IMERG",
+                    "license": "NASA Open Data",
+                    "role": "Lượng mưa viễn thám vệ tinh toàn cầu cập nhật mỗi 30 phút phục vụ quan trắc độc lập.",
+                    "status": "active_schema_supported"
+                },
+                {
+                    "name": "ECMWF ERA5",
+                    "license": "Copernicus Climate Data Store",
+                    "role": "Dữ liệu tái phân tích khí quyển lịch sử phục vụ huấn luyện và đánh giá mô hình.",
+                    "status": "training_dataset_source"
+                }
+            ]
+        }
+    ]
+}
+
+@router.get("/models-ecosystem", summary="Khung kiến trúc mô hình vật lý, AI và GIS mở của NorthStar")
+def get_models_ecosystem():
+    """Trả về chi tiết 5 trụ cột công nghệ mô hình hóa mở: Khí tượng vật lý (WRF), Thủy văn 2D (ANUGA/SFINCS), AI/ML, GIS và Định tuyến."""
+    return MODELS_ECOSYSTEM
