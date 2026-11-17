@@ -225,6 +225,40 @@ class TestAIProviderSuite(unittest.TestCase):
         self.assertIn("summary", data)
         self.assertIn("grouped_reports", data)
 
+    def test_api_voice_sos_text_endpoint(self):
+        payload = {
+            "transcript": "Cứu tôi với, nước dâng tới nóc bếp ở Bảo Yên, có 4 người gồm 2 cháu nhỏ hết lương thực!",
+            "lat": 22.2541,
+            "lng": 104.3821,
+            "contact_name": "Người gọi SOS",
+            "contact_phone": "0987112233",
+            "auto_create_beacon": True
+        }
+        response = self.client.post("/api/ai/voice-sos/text", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+        self.assertIn("transcript", data)
+        self.assertIn("classification", data)
+        self.assertIn("emergency_hotlines", data)
+        self.assertIsNotNone(data["beacon"])
+
+    def test_api_voice_sos_audio_endpoint_with_mock_whisper(self):
+        with patch("app.routers.ai_endpoints.transcribe_audio_groq", new_callable=AsyncMock) as mock_stt:
+            mock_stt.return_value = "Lũ bùn quét Làng Nủ, cần xuồng cứu hộ khẩn cấp đưa 3 người già đi cấp cứu!"
+            dummy_audio = b"\x00" * 500
+            response = self.client.post(
+                "/api/ai/voice-sos?lat=22.254&lng=104.382&contact_name=VoiceTest",
+                content=dummy_audio,
+                headers={"Content-Type": "audio/webm"}
+            )
+            self.assertEqual(response.status_code, 200)
+            data = response.json()
+            self.assertEqual(data["status"], "success")
+            self.assertIn("Làng Nủ", data["transcript"])
+            self.assertIn("classification", data)
+            self.assertIsNotNone(data["beacon"])
+
 
 if __name__ == "__main__":
     unittest.main()
