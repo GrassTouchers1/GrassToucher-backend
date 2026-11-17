@@ -222,6 +222,51 @@ async def transcribe_audio_groq(audio_bytes: bytes, content_type: str = "audio/w
     return None
 
 
+VIETNAM_LOCATION_COORDS = {
+    "thái nguyên": (21.5928, 105.8442, "TP. Thái Nguyên"),
+    "hoàng văn thụ": (21.5928, 105.8442, "Đường Hoàng Văn Thụ, Thái Nguyên"),
+    "quang vinh": (21.6020, 105.8350, "Phường Quang Vinh, Thái Nguyên"),
+    "chùa hang": (21.6150, 105.8650, "Phường Chùa Hang, Thái Nguyên"),
+    "gia bẩy": (21.5980, 105.8500, "Cầu Gia Bảy, Thái Nguyên"),
+    "sông cầu": (21.5928, 105.8442, "Lưu vực Sông Cầu, Thái Nguyên"),
+    "làng nủ": (22.3167, 104.3833, "Thôn Làng Nủ, Bảo Yên, Lào Cai"),
+    "bảo yên": (22.2850, 104.3420, "Huyện Bảo Yên, Lào Cai"),
+    "phố ràng": (22.2850, 104.3420, "TT. Phố Ràng, Lào Cai"),
+    "lào cai": (22.4856, 103.9707, "TP. Lào Cai"),
+    "yên bái": (21.7167, 104.8833, "TP. Yên Bái"),
+    "hồng hà": (21.7167, 104.8833, "Phường Hồng Hà, Yên Bái"),
+    "sông thao": (21.7167, 104.8833, "Ven sông Thao, Yên Bái"),
+    "cầu giấy": (21.0370, 105.7800, "Quận Cầu Giấy, Hà Nội"),
+    "hoa bằng": (21.0220, 105.7950, "Phố Hoa Bằng, Cầu Giấy"),
+    "yên hòa": (21.0210, 105.7940, "Phường Yên Hòa, Cầu Giấy"),
+    "chương mỹ": (20.8920, 105.6580, "Huyện Chương Mỹ, Hà Nội"),
+    "nam phương tiến": (20.8920, 105.6580, "Xã Nam Phương Tiến, Chương Mỹ"),
+    "sông bùi": (20.8920, 105.6580, "Ven Sông Bùi, Chương Mỹ"),
+    "nam từ liêm": (21.0120, 105.7650, "Quận Nam Từ Liêm, Hà Nội"),
+    "bắc từ liêm": (21.0650, 105.7550, "Quận Bắc Từ Liêm, Hà Nội"),
+    "ba đình": (21.0340, 105.8250, "Quận Ba Đình, Hà Nội"),
+    "đống đa": (21.0180, 105.8280, "Quận Đống Đa, Hà Nội"),
+    "hoàn kiếm": (21.0285, 105.8542, "Quận Hoàn Kiếm, Hà Nội"),
+    "phong châu": (21.3117, 105.2890, "Cầu Phong Châu, Phú Thọ"),
+    "phú thọ": (21.3117, 105.2890, "Tỉnh Phú Thọ"),
+    "tam nông": (21.3117, 105.2890, "Huyện Tam Nông, Phú Thọ"),
+    "tuyên quang": (21.8200, 105.2200, "TP. Tuyên Quang"),
+    "chiêm hóa": (22.1500, 105.2600, "Huyện Chiêm Hóa, Tuyên Quang"),
+    "hạ long": (20.9500, 107.0800, "TP. Hạ Long, Quảng Ninh"),
+    "cát hải": (20.8000, 106.9100, "Huyện Cát Hải, Hải Phòng"),
+    "hiệp hòa": (21.3200, 106.0500, "Huyện Hiệp Hòa, Bắc Giang"),
+    "nguyên bình": (22.6100, 105.9700, "Huyện Nguyên Bình, Cao Bằng")
+}
+
+def resolve_sos_coordinates(transcript: str, client_lat: float, client_lng: float) -> tuple[float, float, Optional[str]]:
+    """Tự động nhận diện và nắn chỉnh tọa độ chính xác dựa theo lời kêu cứu giọng nói."""
+    t_lower = (transcript or "").lower()
+    for name, (target_lat, target_lng, label) in VIETNAM_LOCATION_COORDS.items():
+        if name in t_lower:
+            return target_lat, target_lng, label
+    return client_lat, client_lng, None
+
+
 class VoiceTextSOSRequest(BaseModel):
     transcript: str = Field(..., min_length=2, description="Nội dung lời kêu cứu đã được nhận diện từ giọng nói")
     lat: float = Field(21.0285, description="Vĩ độ GPS người kêu cứu")
@@ -288,10 +333,12 @@ async def process_voice_sos_audio(
         }
 
     # Bóc tách ngữ nghĩa cứu hộ bằng LLM
+    resolved_lat, resolved_lng, loc_label = resolve_sos_coordinates(transcript, lat, lng)
+    loc_desc = loc_label if loc_label else f"Tọa độ GPS ({resolved_lat:.4f}, {resolved_lng:.4f})"
     classification = await ai.classify_emergency(
         message=transcript,
         contact_phone=contact_phone,
-        location_text=f"Tọa độ GPS ({lat:.4f}, {lng:.4f})"
+        location_text=loc_desc
     )
 
     created_beacon = None
@@ -304,19 +351,22 @@ async def process_voice_sos_audio(
         sos_body = SOSCreate(
             contact_name=(contact_name or "Nạn nhân Voice SOS")[:50],
             phone=(contact_phone or "0999999999")[:20],
-            lat=lat,
-            lng=lng,
+            lat=resolved_lat,
+            lng=resolved_lng,
             people_count=max(1, min(100, classification.people_affected or 1)),
             has_elderly_or_children=has_vulnerable,
             water_level_cm=45.0 if prio in ["high", "critical"] else 20.0,
             priority=prio,
-            notes=f"🎙️ [Voice SOS]: {transcript}"[:480]
+            notes=f"🎙️ [Voice SOS - {loc_desc}]: {transcript}"[:480]
         )
         created_beacon = create_sos_beacon(sos_body)
 
     return {
         "status": "success",
         "transcript": transcript,
+        "resolved_lat": resolved_lat,
+        "resolved_lng": resolved_lng,
+        "location_label": loc_label,
         "classification": classification.model_dump(),
         "beacon": created_beacon,
         "provider_used": f"{provider_used} + {classification.provider_used}",
@@ -337,10 +387,12 @@ async def process_voice_sos_text(
     req: VoiceTextSOSRequest,
     ai: AIProvider = Depends(get_ai_provider)
 ) -> dict[str, Any]:
+    resolved_lat, resolved_lng, loc_label = resolve_sos_coordinates(req.transcript, req.lat, req.lng)
+    loc_desc = loc_label if loc_label else f"Tọa độ GPS ({resolved_lat:.4f}, {resolved_lng:.4f})"
     classification = await ai.classify_emergency(
         message=req.transcript,
         contact_phone=req.contact_phone,
-        location_text=f"Tọa độ GPS ({req.lat:.4f}, {req.lng:.4f})"
+        location_text=loc_desc
     )
 
     created_beacon = None
@@ -353,19 +405,22 @@ async def process_voice_sos_text(
         sos_body = SOSCreate(
             contact_name=(req.contact_name or "Nạn nhân Voice SOS")[:50],
             phone=(req.contact_phone or "0999999999")[:20],
-            lat=req.lat,
-            lng=req.lng,
+            lat=resolved_lat,
+            lng=resolved_lng,
             people_count=max(1, min(100, classification.people_affected or 1)),
             has_elderly_or_children=has_vulnerable,
             water_level_cm=45.0 if prio in ["high", "critical"] else 20.0,
             priority=prio,
-            notes=f"🎙️ [Client Voice SOS]: {req.transcript}"[:480]
+            notes=f"🎙️ [Voice SOS - {loc_desc}]: {req.transcript}"[:480]
         )
         created_beacon = create_sos_beacon(sos_body)
 
     return {
         "status": "success",
         "transcript": req.transcript,
+        "resolved_lat": resolved_lat,
+        "resolved_lng": resolved_lng,
+        "location_label": loc_label,
         "classification": classification.model_dump(),
         "beacon": created_beacon,
         "provider_used": f"WebSpeech + {classification.provider_used}",
