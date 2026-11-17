@@ -129,11 +129,18 @@ def init_fallback_db():
                     INSERT INTO fallback_disasters (title, hazard_type, severity, status, description, lng, lat, radius_m, start_time, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, [
-                    ("Cảnh báo Lũ báo động 2 sông Tích - sông Đáy", "flood", "high", "active", "Mực nước lũ dâng cao gây ngập tràn đê bối tại Quốc Oai và Thạch Thất.", 105.6100, 20.9800, 1200.0, now_iso, now_iso),
-                    ("Nguy cơ sạt trượt đất bờ đê Tả Bùi", "landslide", "critical", "active", "Đoạn đê qua Nam Phương Tiến có hiện tượng sạt trượt đất, cấm phương tiện trọng tải lớn.", 105.6580, 20.8920, 500.0, now_iso, now_iso),
-                    ("Cây đổ chắn ngang đường do bão (Đại lộ Thăng Long)", "storm", "high", "active", "Cây cổ thụ bật gốc tại hầm chui số 3 An Khánh, lực lượng chức năng đang giải tỏa.", 105.7480, 21.0010, 300.0, now_iso, now_iso),
-                    ("Điểm đen ngập sâu đô thị Cầu Giấy (Hoa Bằng)", "flood", "medium", "active", "Mực nước dâng 27cm sau cơn mưa lớn, hạn chế xe máy qua lại.", 105.7950, 21.0220, 250.0, now_iso, now_iso),
-                    ("Cảnh báo ngập hầm chui & ngã ba Giải Phóng - Pháp Vân", "flood", "high", "active", "Khu vực trũng cửa ngõ phía Nam ngập 28cm.", 105.8465, 20.9625, 350.0, now_iso, now_iso)
+                    ("Lũ bùn quét & sạt lở núi kinh hoàng (Thôn Làng Nủ, Bảo Yên, Lào Cai)", "landslide", "critical", "active", "Dòng lũ bùn đá kinh hoàng từ núi Voi tràn qua bản làng, chia cắt toàn bộ lối vào, nhiều điểm ngập sâu và bùn lầy nguy hiểm.", 104.3833, 22.3167, 2500.0, now_iso, now_iso),
+                    ("Lũ đặc biệt lớn trên BĐ3 sông Thao (TP Yên Bái)", "flood", "critical", "active", "Mực nước sông Thao vượt đỉnh lũ lịch sử 1968, ngập lụt diện rộng toàn bộ phường Hồng Hà, Yên Ninh, Đồng Tâm (sâu 1.5m - 3.2m).", 104.8833, 21.7167, 3000.0, now_iso, now_iso),
+                    ("Lũ khẩn cấp sông Cầu - Ngập lụt nghiêm trọng TP Thái Nguyên", "flood", "critical", "active", "Mực nước dâng vượt đê Chã và cầu Gia Bảy, ngập sâu toàn diện các phường Quang Vinh, Chùa Hang, Hoàng Văn Thụ.", 105.8442, 21.5928, 2500.0, now_iso, now_iso),
+                    ("Tràn đê bối sông Cầu & nguy cơ vỡ đê Tả Cầu (Hiệp Hòa, Bắc Giang)", "flood", "high", "active", "Mực nước lũ sông Cầu dâng cao tràn các bờ bao, đê bối xã Hợp Thịnh và Mai Đình, uy hiếp 4 xã ven sông.", 106.0500, 21.3200, 2000.0, now_iso, now_iso),
+                    ("Sạt lở vách núi taluy dương chia cắt QL34 (Nguyên Bình, Cao Bằng)", "landslide", "critical", "active", "Sạt trượt đất đá khối lượng lớn tại đèo Pia Oắc vùi lấp mặt đường, phong tỏa tuyệt đối lưu thông.", 105.9700, 22.6100, 1500.0, now_iso, now_iso),
+                    ("Sự cố sập mố nhịp cầu Phong Châu trên sông Thao (Tam Nông, Phú Thọ)", "landslide", "critical", "active", "Lũ xiết gây sập 2 nhịp giàn thép cầu Phong Châu trên QL32C, cấm mọi phương tiện và người dân tiếp cận.", 105.2890, 21.3117, 1200.0, now_iso, now_iso),
+                    ("Tâm bão đổ bộ gió giật cấp 14 & sóng biển dâng cao (Vịnh Hạ Long)", "storm", "critical", "active", "Gió bão cực mạnh làm tốc mái, đổ gãy cây xanh, sạt trượt đất đồi và chìm tàu tại Bãi Cháy, Hòn Gai.", 107.0800, 20.9500, 3500.0, now_iso, now_iso),
+                    ("Triều cường cực hạn kết hợp sóng bão phá vỡ kè biển (Cát Hải, Hải Phòng)", "storm", "high", "active", "Nước biển dâng tràn qua thân kè vào khu dân cư thị trấn Cát Hải, ngập sâu 1m - 1.5m.", 106.9100, 20.8000, 2500.0, now_iso, now_iso),
+                    ("Xả lũ khẩn cấp hồ Tuyên Quang - Ngập úng hạ lưu sông Gâm & Lô", "flood", "high", "active", "Thủy điện mở 8 cửa xả đáy, dòng chảy xiết ngập bãi ven sông TP Tuyên Quang và huyện Chiêm Hóa.", 105.2200, 21.8200, 2200.0, now_iso, now_iso),
+                    ("Cảnh báo ngập bãi bồi hạ lưu khi Thủy điện Hòa Bình mở cửa xả đáy", "flood", "medium", "active", "Lưu lượng xả lớn làm dâng cao mực nước sông Đà, ngập tràn các vùng bãi trũng TP Hòa Bình và Kỳ Sơn.", 105.3333, 20.8167, 2000.0, now_iso, now_iso),
+                    ("Lũ báo động 3 sông Bùi - Ngập úng sâu xã Nam Phương Tiến (Chương Mỹ)", "flood", "high", "active", "Nước lũ dâng ngập trắng các thôn Nhân Lý, Nam Hài, sâu từ 1m đến 2m, kéo dài nhiều ngày.", 105.6580, 20.8920, 1500.0, now_iso, now_iso),
+                    ("Điểm ngập úng đô thị Cầu Giấy - Hoa Bằng", "flood", "medium", "active", "Mực nước ngập 35cm sau cơn mưa lớn kéo dài, các phương tiện xe máy di chuyển khó khăn.", 105.7950, 21.0220, 300.0, now_iso, now_iso)
                 ])
 
             # Seed default shelters if empty
@@ -144,12 +151,45 @@ def init_fallback_db():
                     INSERT INTO fallback_shelters (name, address, lng, lat, capacity, current_occupancy, contact_phone, supplies_status, status, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, [
-                    ("Trường THPT Yên Hòa (Điểm sơ tán Cầu Giấy)", "Ngõ 251 Nguyễn Khang, Yên Hòa, Cầu Giấy", 105.7940, 21.0210, 600, 45, "024-3833-1122", "Đầy đủ nước sạch, lương thực và chăn ấm", "open", now_iso),
-                    ("Nhà thi đấu quận Hoàng Mai (Trạm cứu trợ Đền Lừ)", "Đường Tam Trinh, Hoàng Mai, Hà Nội", 105.8610, 20.9850, 1200, 110, "024-3864-4455", "Sẵn sàng trạm y tế dã chiến và ca nô cứu nạn", "open", now_iso),
-                    ("Trường Tiểu học Nam Phương Tiến A (Điểm tránh lũ Chương Mỹ)", "Xã Nam Phương Tiến, Chương Mỹ, Hà Nội", 105.6620, 20.8960, 500, 160, "024-3386-7788", "Đã tiếp nhận lương khô, áo phao và thuốc men", "open", now_iso),
-                    ("Cung Thiếu nhi Hà Nội mới (Điểm tập kết Nam Từ Liêm)", "Đường Phạm Hùng, Mỹ Đình, Nam Từ Liêm", 105.7820, 21.0180, 1500, 80, "024-3936-2244", "Sẵn sàng hội trường lớn và điện máy phát", "open", now_iso),
-                    ("Trụ sở UBND xã Cấn Hữu (Điểm an toàn Quốc Oai)", "Xã Cấn Hữu, Quốc Oai, Hà Nội", 105.6150, 20.9450, 400, 75, "024-3384-3311", "Túc trực cứu hộ 24/7", "open", now_iso),
-                    ("Trung tâm Huấn luyện & Sơ tán Thanh Trì", "Đường 70, Tả Thanh Oai, Thanh Trì", 105.8450, 20.9420, 800, 95, "024-3861-5566", "Sẵn sàng lương thực 7 ngày cho 500 người", "open", now_iso)
+                    ("Trung tâm Chỉ huy Quân sự Huyện Bảo Yên (Sơ tán Làng Nủ)", "Khu 3B, TT. Phố Ràng, Bảo Yên, Lào Cai", 104.3420, 22.2850, 600, 180, "0214-3876-114", "Trạm chỉ huy dã chiến, 500 suất lương khô và thuốc men", "open", now_iso),
+                    ("Nhà thi đấu Đa năng Tỉnh Lào Cai", "Đại lộ Trần Hưng Đạo, P. Bắc Lệnh, TP Lào Cai", 103.9780, 22.4510, 1500, 320, "0214-3840-234", "Máy phát điện công suất lớn, trạm lọc nước sạch dã chiến", "open", now_iso),
+                    ("Trường THPT Chuyên Nguyễn Tất Thành (Điểm tránh lũ TP Yên Bái)", "Tổ 2, P. Đồng Tâm, TP Yên Bái", 104.8720, 21.7250, 1000, 450, "0216-3852-368", "1000 chăn ấm, bình nước 20L và mì ăn liền tiếp tế", "open", now_iso),
+                    ("Trường Tiểu học & THCS Trần Phú (Trạm sơ tán Lục Yên)", "TT. Yên Thế, Huyện Lục Yên, Yên Bái", 104.7200, 22.1150, 500, 110, "0216-3845-122", "Khu nhà 3 tầng kiên cố, sẵn sàng pin sạc dự phòng", "open", now_iso),
+                    ("Cung Văn hóa Lao động Tỉnh Thái Nguyên (Bến Đoan)", "Số 6 Đội Cấn, P. Trưng Vương, TP Thái Nguyên", 105.8360, 21.5870, 1400, 680, "0208-3855-432", "Điểm tập kết ca nô cứu hộ, phát cơm nóng và nước ngọt 24/7", "open", now_iso),
+                    ("Trường THPT Trần Quốc Tuấn (Trạm an toàn Sông Cầu)", "TT. Hóa Thượng, Huyện Đồng Hỷ, Thái Nguyên", 105.8750, 21.6320, 600, 95, "0208-3820-115", "Đầy đủ vật tư y tế, chăn màn và lương thực khô", "open", now_iso),
+                    ("Trung tâm Hội nghị Triển lãm Tỉnh Bắc Giang", "Quảng trường 3/2, Đường Hoàng Văn Thụ, TP Bắc Giang", 106.1980, 21.2760, 1200, 210, "0204-3854-222", "Hội trường rộng, máy phát điện liên tục, đội y tế túc trực", "open", now_iso),
+                    ("Nhà thi đấu Thể dục Thể thao Tỉnh Phú Thọ", "Đường Hùng Vương, P. Thọ Sơn, TP Việt Trì, Phú Thọ", 105.3950, 21.3220, 1600, 290, "0210-3846-555", "Khu vực ngã ba sông cao ráo, trạm quân y lưu động", "open", now_iso),
+                    ("Trung tâm Y tế Huyện Nguyên Bình (Trạm cấp cứu sạt trượt)", "Khu phố 1, TT. Nguyên Bình, Cao Bằng", 105.9820, 22.5830, 400, 145, "0206-3872-115", "Xe cấp cứu túc trực, cơ số thuốc và máu dự phòng đầy đủ", "open", now_iso),
+                    ("Cung Quy hoạch, Hội chợ & Triển lãm Quảng Ninh (Cung Cá Heo)", "Đường Trần Quốc Nghiễn, P. Hồng Hải, TP Hạ Long", 107.0980, 20.9410, 2500, 620, "0203-3835-678", "Kết cấu thép kiên cố chịu bão cấp 17, bếp ăn dã chiến", "open", now_iso),
+                    ("Cung Văn hóa Lao động Hữu nghị Việt Tiệp Hải Phòng", "Số 53 Lạch Tray, Quận Ngô Quyền, Hải Phòng", 106.6870, 20.8540, 2000, 410, "0225-3847-195", "Trạm trú bão an toàn, kho lương thực dự phòng 10 ngày", "open", now_iso),
+                    ("Trung tâm Văn hóa Thể thao Thanh thiếu nhi Tuyên Quang", "Đường Bình Thuận, P. Tân Quang, TP Tuyên Quang", 105.2150, 21.8230, 900, 170, "0207-3822-456", "Phòng ốc rộng rãi, sẵn sàng quần áo khô và nước đóng chai", "open", now_iso),
+                    ("Trường Cao đẳng Sư phạm Hòa Bình", "Phường Dân Chủ, TP Hòa Bình", 105.3470, 20.8260, 800, 190, "0218-3854-123", "Ký túc xá cao ráo an toàn tránh ngập xả lũ sông Đà", "open", now_iso),
+                    ("Trường THPT Yên Hòa (Điểm sơ tán Cầu Giấy)", "Ngõ 251 Nguyễn Khang, Yên Hòa, Cầu Giấy, Hà Nội", 105.7940, 21.0210, 600, 85, "024-3833-1122", "Đầy đủ nước sạch, lương thực và chăn ấm", "open", now_iso),
+                    ("Trường Tiểu học Nam Phương Tiến A (Điểm tránh lũ Chương Mỹ)", "Xã Nam Phương Tiến, Chương Mỹ, Hà Nội", 105.6620, 20.8960, 500, 210, "024-3386-7788", "Đã tiếp nhận lương khô, áo phao và thuốc men", "open", now_iso)
+                ])
+
+            # Seed default SOS requests if empty
+            sos_count = conn.execute("SELECT COUNT(*) FROM fallback_sos").fetchone()[0]
+            if sos_count == 0:
+                now_iso = datetime.now(timezone.utc).isoformat()
+                conn.executemany("""
+                    INSERT INTO fallback_sos (contact_name, phone, lng, lat, people_count, has_elderly_or_children, water_level_cm, priority, status, notes, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, [
+                    ("Hoàng Văn Tuấn", "0982341992", 104.3780, 22.3120, 5, 1, 0.0, "critical", "pending", "Đồi sạt cô lập 5 người có 2 cháu nhỏ 3 tuổi và 5 tuổi, cạn kiệt sữa và nước uống, đường sạt không đi bộ ra được!", now_iso, now_iso),
+                    ("Sùng A Páo", "0971452881", 103.7450, 22.5480, 7, 1, 30.0, "high", "pending", "Nước suối dâng tràn qua nóc bếp, 1 cụ già 82 tuổi liệt giường cần chuyển cáng cứu hộ gấp!", now_iso, now_iso),
+                    ("Nguyễn Thị Mai Lan", "0915678234", 104.8825, 21.7145, 4, 1, 180.0, "critical", "pending", "Nước sông Thao dâng ngập hết tầng 1 ngõ 84 Kim Đồng, trèo lên mái tôn chờ ca nô, pin sắp cạn!", now_iso, now_iso),
+                    ("Vũ Đình Cường", "0944123890", 104.8320, 21.6850, 3, 0, 120.0, "high", "pending", "Thôn ngập sâu tứ bề tại Trấn Yên, cần viện trợ phao cứu sinh và nước sạch.", now_iso, now_iso),
+                    ("Lê Văn Hùng", "0988776655", 105.8385, 21.5975, 6, 1, 160.0, "critical", "pending", "Ngập nóc nhà cấp 4 tổ 8 Quang Vinh, có phụ nữ mang thai tháng thứ 8 và trẻ em, đề nghị đội xuồng hỗ trợ khẩn!", now_iso, now_iso),
+                    ("Trần Thị Ánh Tuyết", "0963214589", 105.8480, 21.6020, 4, 1, 90.0, "high", "pending", "Nước ngập ngang ngực gần cầu Gia Bảy, gia đình cần di tản tới điểm sơ tán Cung Văn hóa.", now_iso, now_iso),
+                    ("Nguyễn Văn Đạt", "0977889900", 106.0380, 21.3180, 8, 1, 80.0, "high", "pending", "Nước sông Cầu tràn đê bối cô lập xóm ven sông Hiệp Hòa, cần 50 áo phao và lương khô.", now_iso, now_iso),
+                    ("Đội Tuần tra Giao thông", "0206-3871-999", 105.9660, 22.6120, 12, 0, 0.0, "critical", "pending", "Đất đá vùi lấp xe chở khách trên đèo Pia Oắc km180 QL34, cần máy xúc chuyên dụng và đội tìm kiếm cứu nạn!", now_iso, now_iso),
+                    ("Bùi Đình Trọng", "0934567112", 105.2860, 21.3080, 4, 1, 40.0, "high", "pending", "Bãi bồi sông Thao sát mố cầu Phong Châu nứt toác nguy cơ sập nhà, xin hỗ trợ sơ tán khẩn cấp người và gia súc.", now_iso, now_iso),
+                    ("Đỗ Thành Trung", "0912456789", 107.0920, 20.9750, 5, 1, 70.0, "high", "pending", "Bão tốc toàn bộ mái tôn tại Hà Khánh - Hạ Long, nước dâng ngập, có cháu nhỏ sốt cao cần hỗ trợ y tế khẩn cấp.", now_iso, now_iso),
+                    ("Vũ Hải Nam", "0904321987", 106.7920, 20.7020, 3, 0, 85.0, "medium", "pending", "Sóng biển đánh tràn kè Đồ Sơn, ghe xuồng đứt dây, đang trú tầng 2.", now_iso, now_iso),
+                    ("Lý A Dũng", "0986543210", 105.2500, 22.1200, 6, 1, 110.0, "high", "pending", "Thủy điện xả lũ dòng nước xiết cô lập nhà ở Yên Nguyên - Chiêm Hóa, cần ca nô cứu nạn.", now_iso, now_iso),
+                    ("Trần Văn Cường", "0983112233", 105.6590, 20.8930, 5, 1, 135.0, "critical", "pending", "Nước sông Bùi tràn đê ngập 1.35m xóm Bến Nam Phương Tiến, mất điện 4 ngày, cần tiếp tế khẩn cấp đồ ăn.", now_iso, now_iso),
+                    ("Phạm Thị Hương", "0912987654", 105.7948, 21.0225, 2, 0, 38.0, "medium", "pending", "Ngập sâu 38cm ngõ Hoa Bằng xe máy chết máy, xin xe cứu hộ kéo xe khỏi điểm ngập.", now_iso, now_iso)
                 ])
 
             conn.commit()

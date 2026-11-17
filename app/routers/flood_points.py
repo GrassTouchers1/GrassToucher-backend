@@ -302,6 +302,33 @@ DEFAULT_FLOOD_POINTS = [
     {"id": 129, "name": "Mỗ Lao - Nguyễn Văn Lộc (Hà Đông)", "sensor_id": "SENSOR-129", "threshold_cm": 20, "lng": 105.7845, "lat": 20.9815, "depth_cm": 16.0, "last_reading_at": None},
     {"id": 130, "name": "Bát Tràng (Đường đê Bát Tràng - Gia Lâm)", "sensor_id": "SENSOR-130", "threshold_cm": 20, "lng": 105.9125, "lat": 20.9785, "depth_cm": 13.0, "last_reading_at": None},
 
+    # --- Mạng lưới Trạm Thủy văn & Quan trắc Ngập lụt Trọng điểm Miền Bắc ---
+    {"id": 131, "name": "Trạm Thủy văn Lào Cai (Sông Hồng)", "sensor_id": "SENSOR-131", "threshold_cm": 30, "lng": 103.9650, "lat": 22.4850, "depth_cm": 38.0, "last_reading_at": None},
+    {"id": 132, "name": "Trạm Thủy văn Bảo Hà (Lào Cai - Sông Hồng)", "sensor_id": "SENSOR-132", "threshold_cm": 30, "lng": 104.3400, "lat": 22.1800, "depth_cm": 45.0, "last_reading_at": None},
+    {"id": 133, "name": "Trạm Thủy văn TP Yên Bái (Sông Thao)", "sensor_id": "SENSOR-133", "threshold_cm": 30, "lng": 104.8800, "lat": 21.7100, "depth_cm": 55.0, "last_reading_at": None},
+    {"id": 134, "name": "Trạm Cảnh báo Lũ quét Làng Nủ (Bảo Yên)", "sensor_id": "SENSOR-134", "threshold_cm": 25, "lng": 104.3850, "lat": 22.3150, "depth_cm": 60.0, "last_reading_at": None},
+    {"id": 135, "name": "Trạm Thủy văn Gia Bảy (Thái Nguyên - Sông Cầu)", "sensor_id": "SENSOR-135", "threshold_cm": 30, "lng": 105.8420, "lat": 21.5950, "depth_cm": 48.0, "last_reading_at": None},
+    {"id": 136, "name": "Trạm Cảnh báo Ngập Đê Chã (Phổ Yên - Thái Nguyên)", "sensor_id": "SENSOR-136", "threshold_cm": 25, "lng": 105.8900, "lat": 21.4300, "depth_cm": 35.0, "last_reading_at": None},
+    {"id": 137, "name": "Trạm Thủy văn Phủ Lạng Thương (Bắc Giang - Sông Thương)", "sensor_id": "SENSOR-137", "threshold_cm": 30, "lng": 106.1850, "lat": 21.2700, "depth_cm": 40.0, "last_reading_at": None},
+    {"id": 138, "name": "Trạm Cảnh báo Tràn Đê Hiệp Hòa (Bắc Giang)", "sensor_id": "SENSOR-138", "threshold_cm": 25, "lng": 106.0450, "lat": 21.3200, "depth_cm": 36.0, "last_reading_at": None},
+    {"id": 139, "name": "Trạm Thủy văn Việt Trì (Sông Lô - Phú Thọ)", "sensor_id": "SENSOR-139", "threshold_cm": 30, "lng": 105.4100, "lat": 21.3000, "depth_cm": 32.0, "last_reading_at": None},
+    {"id": 140, "name": "Trạm Giám sát Mực nước Cầu Phong Châu (Phú Thọ)", "sensor_id": "SENSOR-140", "threshold_cm": 25, "lng": 105.2890, "lat": 21.3115, "depth_cm": 50.0, "last_reading_at": None},
+    {"id": 141, "name": "Trạm Thủy văn Bằng Giang (Cao Bằng)", "sensor_id": "SENSOR-141", "threshold_cm": 30, "lng": 106.2600, "lat": 22.6700, "depth_cm": 42.0, "last_reading_at": None},
+    {"id": 142, "name": "Trạm Cảnh báo Sạt lở QL34 Đèo Pia Oắc (Cao Bằng)", "sensor_id": "SENSOR-142", "threshold_cm": 20, "lng": 105.9700, "lat": 22.6100, "depth_cm": 45.0, "last_reading_at": None},
+    {"id": 143, "name": "Trạm Hải văn Bãi Cháy (Hạ Long - Quảng Ninh)", "sensor_id": "SENSOR-143", "threshold_cm": 30, "lng": 107.0500, "lat": 20.9500, "depth_cm": 45.0, "last_reading_at": None},
+    {"id": 144, "name": "Trạm Cảnh báo Triều dâng Cẩm Phả (Quảng Ninh)", "sensor_id": "SENSOR-144", "threshold_cm": 25, "lng": 107.2750, "lat": 21.0150, "depth_cm": 38.0, "last_reading_at": None},
+    {"id": 145, "name": "Trạm Hải văn Hòn Dáu (Đồ Sơn - Hải Phòng)", "sensor_id": "SENSOR-145", "threshold_cm": 30, "lng": 106.8150, "lat": 20.6700, "depth_cm": 36.0, "last_reading_at": None},
+    {"id": 146, "name": "Trạm Cảnh báo Ngập Triều Cát Hải (Hải Phòng)", "sensor_id": "SENSOR-146", "threshold_cm": 25, "lng": 106.9100, "lat": 20.8000, "depth_cm": 40.0, "last_reading_at": None},
+    {"id": 147, "name": "Trạm Thủy văn Tuyên Quang (Sông Lô)", "sensor_id": "SENSOR-147", "threshold_cm": 30, "lng": 105.2200, "lat": 21.8200, "depth_cm": 35.0, "last_reading_at": None},
+    {"id": 148, "name": "Trạm Giám sát Hạ du Thủy điện Tuyên Quang (Chiêm Hóa)", "sensor_id": "SENSOR-148", "threshold_cm": 25, "lng": 105.2700, "lat": 22.1400, "depth_cm": 42.0, "last_reading_at": None},
+    {"id": 149, "name": "Trạm Thủy văn Hòa Bình (Hạ lưu Đập Sông Đà)", "sensor_id": "SENSOR-149", "threshold_cm": 30, "lng": 105.3300, "lat": 20.8100, "depth_cm": 30.0, "last_reading_at": None},
+    {"id": 150, "name": "Trạm Cảnh báo Lũ Lương Sơn (Hòa Bình)", "sensor_id": "SENSOR-150", "threshold_cm": 25, "lng": 105.5100, "lat": 20.8800, "depth_cm": 28.0, "last_reading_at": None},
+    {"id": 151, "name": "Trạm Thủy văn Bến Hồ (Bắc Ninh - Sông Đuống)", "sensor_id": "SENSOR-151", "threshold_cm": 30, "lng": 106.0900, "lat": 21.0500, "depth_cm": 26.0, "last_reading_at": None},
+    {"id": 152, "name": "Trạm Thủy văn Thất Khê (Lạng Sơn - Sông Kỳ Cùng)", "sensor_id": "SENSOR-152", "threshold_cm": 30, "lng": 106.4900, "lat": 22.2500, "depth_cm": 34.0, "last_reading_at": None},
+    {"id": 153, "name": "Trạm Thủy văn Ninh Bình (Sông Đáy)", "sensor_id": "SENSOR-153", "threshold_cm": 25, "lng": 105.9750, "lat": 20.2550, "depth_cm": 22.0, "last_reading_at": None},
+    {"id": 154, "name": "Trạm Thủy văn Ba Thá (Hà Nội - Sông Đáy)", "sensor_id": "SENSOR-154", "threshold_cm": 25, "lng": 105.7150, "lat": 20.8350, "depth_cm": 30.0, "last_reading_at": None},
+    {"id": 155, "name": "Trạm Đo Mực Nước Lũ Sông Bùi (Chương Mỹ - Hà Nội)", "sensor_id": "SENSOR-155", "threshold_cm": 20, "lng": 105.6550, "lat": 20.8900, "depth_cm": 42.0, "last_reading_at": None},
+
 ]
 
 
