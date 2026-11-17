@@ -79,6 +79,20 @@ class GroqProvider(AIProvider):
                     choices = data.get("choices", [])
                     if choices:
                         return choices[0].get("message", {}).get("content", "")
+                elif res.status_code == 404:
+                    logger.warning("Mô hình Groq '%s' không tồn tại (HTTP 404). Đang tự động tìm mô hình khả dụng...", self.model)
+                    for alt_model in ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"]:
+                        if alt_model == self.model:
+                            continue
+                        payload["model"] = alt_model
+                        alt_res = await client.post(GROQ_API_URL, json=payload, headers=headers)
+                        if alt_res.status_code == 200:
+                            self.model = alt_model
+                            logger.info("Đã tự động chuyển thành công sang mô hình: %s", alt_model)
+                            alt_data = alt_res.json()
+                            choices = alt_data.get("choices", [])
+                            if choices:
+                                return choices[0].get("message", {}).get("content", "")
                 elif res.status_code in (401, 403):
                     logger.warning("Groq API xác thực thất bại (HTTP %s). Vui lòng kiểm tra GROQ_API_KEY.", res.status_code)
                 elif res.status_code == 429:
