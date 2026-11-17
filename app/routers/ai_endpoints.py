@@ -232,6 +232,32 @@ class VoiceTextSOSRequest(BaseModel):
 
 
 @router.post(
+    "/voice-sos/transcribe",
+    summary="Chuyển giọng nói sang văn bản siêu tốc (Groq Whisper LPU)",
+    description="Nhận tệp âm thanh tiếng Việt và trả về văn bản để nạn nhân xem lại và chỉnh sửa trước khi bấm gửi cứu hộ."
+)
+async def transcribe_emergency_audio(request: Request) -> dict[str, Any]:
+    audio_bytes = await request.body()
+    if not audio_bytes or len(audio_bytes) < 100:
+        raise HTTPException(status_code=400, detail="Tệp âm thanh trống hoặc không hợp lệ")
+
+    content_type = request.headers.get("content-type", "audio/webm")
+    transcript = await transcribe_audio_groq(audio_bytes, content_type)
+    if not transcript:
+        return {
+            "status": "warning",
+            "message": "Không nhận diện được giọng nói qua Whisper. Bạn có thể tự gõ nội dung vào ô văn bản bên dưới.",
+            "transcript": ""
+        }
+
+    return {
+        "status": "success",
+        "transcript": transcript,
+        "provider_used": "groq (whisper-large-v3-turbo)"
+    }
+
+
+@router.post(
     "/voice-sos",
     summary="Cấp cứu khẩn cấp bằng giọng nói trực tiếp (Groq Whisper + LLM Auto-Dispatch)",
     description="Nhận tệp âm thanh tiếng Việt, chuyển âm thanh sang văn bản siêu tốc bằng Whisper LPU, bóc tách thực thể và tự động cắm mốc cứu hộ trên bản đồ."
