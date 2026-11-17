@@ -23,7 +23,7 @@ from .routers import (
     satellite,
     simulation,
     rescue_dispatch,
-    ai_assistant,
+    ai_endpoints,
     sitrep,
 )
 
@@ -61,7 +61,7 @@ app.include_router(data_sources.router)
 app.include_router(satellite.router)
 app.include_router(simulation.router)
 app.include_router(rescue_dispatch.router)
-app.include_router(ai_assistant.router)
+app.include_router(ai_endpoints.router)
 app.include_router(sitrep.router)
 
 
