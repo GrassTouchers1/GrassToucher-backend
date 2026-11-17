@@ -49,6 +49,44 @@ class TestFloodNavBackend(unittest.TestCase):
         self.assertIn("hourly_forecast", data)
         self.assertEqual(data.get("city"), "Hà Nội")
 
+    def test_03b_open_meteo_flood_glofas(self):
+        """Kiểm tra tích hợp Open-Meteo Flood API vận hành bởi Copernicus GloFAS."""
+        res = self.client.get("/api/weather/flood-forecast?lat=21.0285&lng=105.8542")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("daily_forecast", data)
+        self.assertIn("max_discharge_forecast", data)
+        self.assertIn("GloFAS", data.get("model", ""))
+        self.assertIn("CC-BY 4.0", data.get("license", ""))
+
+    def test_03c_glofas_basins(self):
+        """Kiểm tra trạm quan trắc lưu vực sông ngòi Bắc Bộ chuẩn Copernicus GloFAS."""
+        res = self.client.get("/api/weather/glofas-basins")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIsInstance(data, list)
+        self.assertGreaterEqual(len(data), 4)
+
+    def test_03d_nasa_gpm(self):
+        """Kiểm tra chuẩn đo mưa vệ tinh không gian NASA GPM IMERG."""
+        res = self.client.get("/api/weather/nasa-gpm?location=Hà Nội")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("accumulated_24h_mm", data)
+        self.assertIn("NASA GPM", data.get("satellite_product", ""))
+
+    def test_03e_osi_open_data_registry(self):
+        """Kiểm tra danh mục tuân thủ giấy phép OSI & cam kết Zero Scraping."""
+        res = self.client.get("/api/weather/open-data-licenses")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("sources", data)
+        source_ids = [s["id"] for s in data["sources"]]
+        self.assertIn("open-meteo", source_ids)
+        self.assertIn("glofas", source_ids)
+        self.assertIn("nasa-gpm", source_ids)
+        self.assertIn("osi-stack", source_ids)
+
     def test_04_ai_predictions(self):
         """Kiểm tra mô hình AI Scikit-learn dự báo mực nước 30/60 phút."""
         res = self.client.get("/api/predictions")
