@@ -2,98 +2,84 @@
 ## OPEN SOURCE LICENSE AUDIT REPORT (OSI COMPLIANCE)
 
 > **Dự án:** NORTHSTAR – Open-source Emergency Response OS  
-> **Cơ quan thẩm định:** Chuẩn Open Source Initiative (OSI) & Quy chế Hội thi Olympic Tin học Sinh viên Việt Nam (OLP 2026 - Khối Phần mềm Mã nguồn mở).  
-> **Giấy phép hệ thống:** **Apache License 2.0 (OSI Approved)** kết hợp **GNU AGPL v3 (Core Engine)**.  
+> **Cơ quan thẩm định:** Chuẩn Open Source Initiative (OSI) & Quy chế Hội thi Olympic Tin học Sinh viên Việt Nam (OLP PMNM).  
+> **Giấy phép hệ thống:** **100% Đồng nhất dưới Apache License 2.0 (OSI Approved)**.  
+> **SPDX License Identifier:** `Apache-2.0`  
 
 ---
 
-## 1. MA TRẬN TƯƠNG THÍCH BẢN QUYỀN (LICENSE COMPATIBILITY MATRIX)
+## 1. THÔNG BÁO VỀ MỤC ĐÍCH & PHẠM VI GIẤY PHÉP
 
-Hệ sinh thái NORTHSTAR được xây dựng trên nguyên tắc **100% Thư viện có Giấy phép Mở được OSI công nhận (OSI-Approved Licenses)**, không chứa mã nguồn đóng hoặc thành phần vi phạm bản quyền:
+Hệ sinh thái **NORTHSTAR** được phát hành theo giấy phép **Apache License 2.0**, một giấy phép phần mềm tự do nguồn mở được tổ chức **Open Source Initiative (OSI)** công nhận chính thức. 
+
+Mục đích của việc lựa chọn Apache License 2.0:
+1. **Tự do truy cập và phát triển:** Cho phép cộng đồng, các trường đại học, cơ quan phòng chống lụt bão và lực lượng cứu nạn cứu hộ tự do sử dụng, chỉnh sửa, nhân bản và phân phối lại mã nguồn mà không mất phí bản quyền.
+2. **Bảo vệ bằng sáng chế & quyền tác giả (Patent & Trademark Protection):** Cung cấp điều khoản cấp quyền sáng chế rõ ràng và bảo vệ thương hiệu của các tác giả đóng góp.
+3. **Tính tương thích cao:** Cho phép kết hợp linh hoạt với các thư viện nguồn mở phổ biến (MIT, BSD, ISC) mà không gây ra xung đột bản quyền.
+
+---
+
+## 2. MA TRẬN TƯƠNG THÍCH BẢN QUYỀN (LICENSE COMPATIBILITY MATRIX)
+
+Toàn bộ hệ thống NORTHSTAR được xây dựng trên nguyên tắc **100% Thư viện có Giấy phép Mở được OSI công nhận**, không chứa bất kỳ thành phần mã nguồn đóng hoặc gói nhị phân độc quyền nào:
 
 ```mermaid
 graph TD
-    subgraph "GIẤY PHÉP PERMISSIVE (TỰ DO CAO NHẤT)"
+    subgraph "GIẤY PHÉP MỞ PHỤ THUỘC (PERMISSIVE LICENSES)"
         MIT[MIT License: FastAPI, Pydantic, Tailwind, OSMnx]
         BSD[BSD 2/3-Clause: Leaflet, NetworkX, Scikit-learn, Uvicorn, httpx]
         ISC[ISC License: Lucide Icons]
     end
 
-    subgraph "GIẤY PHÉP NỀN TẢNG HỆ THỐNG NORTHSTAR"
-        APACHE[Apache License 2.0: Backend, Frontend, API Gateway]
-        AGPL[GNU AGPL v3: Lõi Thuật toán Routing grasstoucher_core]
+    subgraph "GIẤY PHÉP TOÀN BỘ HỆ SINH THÁI NORTHSTAR (UNIFIED)"
+        APACHE_CORE[grasstoucher-core: Apache License 2.0]
+        APACHE_BACKEND[GrassToucher-backend: Apache License 2.0]
+        APACHE_FRONTEND[GrassTouchers-Frontend: Apache License 2.0]
     end
 
-    subgraph "GIẤY PHÉP DỮ LIỆU MỞ (OPEN DATA LICENSES)"
+    subgraph "GIẤY PHÉP DỮ LIỆU ĐỊA LÝ & KHÍ TƯỢNG MỞ (OPEN DATA)"
         ODBL[ODbL 1.0: Dữ liệu mạng lưới đường bộ OpenStreetMap]
         CCBY[CC-BY 4.0: Open-Meteo Weather & Copernicus GloFAS]
-        NASA_PD[NASA Open Data Policy: Vệ tinh đo mưa NASA GPM IMERG]
+        NASA_PD[NASA Open Data Policy: Dữ liệu mưa vệ tinh NASA GPM IMERG]
     end
 
-    MIT --> APACHE
-    BSD --> APACHE
-    ISC --> APACHE
-    APACHE --> AGPL
-    ODBL -.->|Sử dụng dữ liệu độc lập| AGPL
-    CCBY -.->|Truy xuất qua API mở| APACHE
-    NASA_PD -.->|Truy xuất dữ liệu khoa học| APACHE
+    MIT --> APACHE_BACKEND
+    BSD --> APACHE_CORE
+    BSD --> APACHE_FRONTEND
+    ISC --> APACHE_FRONTEND
+    ODBL -.->|Sử dụng dữ liệu độc lập| APACHE_CORE
+    CCBY -.->|Truy xuất API khoa học mở| APACHE_BACKEND
+    NASA_PD -.->|Truy xuất dữ liệu viễn thám mở| APACHE_BACKEND
 ```
 
 ---
 
-## 2. RÀ SOÁT CHI TIẾT CÁC THÀNH PHẦN PHỤ THUỘC (DEPENDENCY AUDIT)
+## 3. RÀ SOÁT CHI TIẾT CÁC THÀNH PHẦN PHỤ THUỘC (DEPENDENCY AUDIT)
 
-### 2.1. Phân hệ Backend (`GrassToucher-backend`)
+### 3.1. Phụ thuộc Backend & Thuật toán Lõi (Python)
+| Thư viện | Phiên bản | Giấy phép | Tình trạng OSI | Mục đích sử dụng |
+| :--- | :--- | :--- | :---: | :--- |
+| **FastAPI** | `>= 0.109` | MIT License | ✅ OSI Approved | Khung dịch vụ RESTful API tốc độ cao |
+| **Uvicorn** | `>= 0.27` | BSD 3-Clause | ✅ OSI Approved | Máy chủ ASGI tiêu chuẩn |
+| **Pydantic** | `>= 2.6` | MIT License | ✅ OSI Approved | Thẩm định dữ liệu và lược đồ API |
+| **NetworkX** | `>= 3.2` | BSD 3-Clause | ✅ OSI Approved | Biểu diễn đồ thị mạng lưới đường giao thông |
+| **OSMnx** | `>= 1.9` | MIT License | ✅ OSI Approved | Tải và trích xuất đồ thị OpenStreetMap |
+| **Scikit-learn**| `>= 1.4` | BSD 3-Clause | ✅ OSI Approved | Mô hình Machine Learning dự báo mực nước |
+| **GeoPandas** | `>= 0.14` | BSD 3-Clause | ✅ OSI Approved | Xử lý dữ liệu hình học không gian địa lý |
+| **HTTPX** | `>= 0.27` | BSD 3-Clause | ✅ OSI Approved | Client HTTP bất đồng bộ gọi API Open-Meteo |
 
-| Thư viện | Phiên bản | Giấy phép | Tình trạng OSI | Đánh giá Tương thích |
-| :--- | :--- | :--- | :--- | :--- |
-| **FastAPI** | 0.115.x | MIT License | **OSI Approved** | Hoàn toàn tương thích Apache-2.0. |
-| **Uvicorn** | 0.32.x | BSD-3-Clause | **OSI Approved** | Tương thích, hiệu năng cao. |
-| **Pydantic** | 2.9.x | MIT License | **OSI Approved** | Khung xác thực schema chuẩn công nghiệp. |
-| **SQLAlchemy** | 2.0.x | MIT License | **OSI Approved** | ORM chuẩn hóa cho PostgreSQL. |
-| **Psycopg / Psycopg2** | 3.2.x | LGPL / BSD | **OSI Approved** | Driver kết nối CSDL PostGIS. |
-| **Httpx** | 0.27.x | BSD-3-Clause | **OSI Approved** | Client HTTP bất đồng bộ cho Whisper & AI. |
-| **Groq SDK** | 0.11.x | Apache License 2.0 | **OSI Approved** | Cùng chuẩn giấy phép với NorthStar. |
-| **Python-Multipart** | 0.0.12 | Apache License 2.0 | **OSI Approved** | Xử lý tệp âm thanh và ảnh hiện trường. |
-
-### 2.2. Phân hệ Lõi Thuật toán & GIS (`GrassToucher-core`)
-
-| Thư viện | Phiên bản | Giấy phép | Tình trạng OSI | Đánh giá Tương thích |
-| :--- | :--- | :--- | :--- | :--- |
-| **NetworkX** | 3.3.x | BSD-3-Clause | **OSI Approved** | Xử lý đồ thị toán học cho thuật toán $A^*$. |
-| **OSMnx** | 1.9.x | MIT License | **OSI Approved** | Trích xuất đồ thị hình học từ OpenStreetMap. |
-| **Shapely** | 2.0.x | BSD-3-Clause | **OSI Approved** | Xử lý hình học đa giác vùng ngập và bán kính SOS. |
-| **Scikit-learn** | 1.5.x | BSD-3-Clause | **OSI Approved** | Mô hình Gradient Boosting Regressor. |
-| **Joblib** | 1.4.x | BSD-3-Clause | **OSI Approved** | Nạp và lưu trữ tệp mô hình máy học. |
-
-### 2.3. Phân hệ Giao diện Người dùng (`GrassTouchers-Frontend`)
-
-| Thư viện | Phiên bản | Giấy phép | Tình trạng OSI | Đánh giá Tương thích |
-| :--- | :--- | :--- | :--- | :--- |
-| **Leaflet.js** | 1.9.4 | BSD-2-Clause | **OSI Approved** | Thư viện bản đồ số mã nguồn mở hàng đầu thế giới. |
-| **Tailwind CSS** | 3.4.x | MIT License | **OSI Approved** | Framework giao diện tối ưu hóa hiệu năng. |
-| **Lucide Icons** | 0.454.x | ISC License | **OSI Approved** | Bộ biểu tượng đồ họa tương thích MIT. |
-| **Google Fonts (Be Vietnam Pro / Inter)** | Variable | SIL Open Font License (OFL 1.1) | **OSI / FSF Compliant** | Phông chữ tiếng Việt chuẩn mở, hiển thị sắc nét. |
-
----
-
-## 3. TÁCH BẠCH BẢN QUYỀN MÃ NGUỒN VÀ BẢN QUYỀN DỮ LIỆU (CODE VS. DATA SEPARATION)
-
-Một sai lầm phổ biến trong các dự án PMNM là áp dụng máy móc giấy phép mã nguồn (như MIT/Apache) cho dữ liệu bản đồ bên ngoài. NorthStar áp dụng nguyên tắc phân định nghiêm ngặt:
-
-1. **Mã nguồn do đội ngũ tự phát triển (Source Code):**
-   - Backend, Frontend, CLI, Tài liệu: Phát hành theo **Apache License 2.0**.
-   - Lõi thuật toán `grasstoucher_core`: Phát hành theo **GNU AGPL v3** (Bảo đảm tính mở tuyệt đối của thuật toán định tuyến cứu hộ).
-2. **Dữ liệu Không gian OpenStreetMap:**
-   - Được bảo vệ bởi **ODbL 1.0**. NorthStar sử dụng dữ liệu OSM để trích xuất đồ thị mà không làm thay đổi hay chiếm đoạt bản quyền cơ sở dữ liệu gốc của OSM Foundation.
-3. **Dữ liệu Thời tiết & Khí tượng:**
-   - Open-Meteo & Copernicus GloFAS theo **Creative Commons Attribution 4.0 (CC-BY 4.0)**.
-   - NASA GPM theo **NASA Open Data Policy (Public Domain)**.
+### 3.2. Phụ thuộc Frontend (Web & PWA)
+| Thư viện | Phiên bản | Giấy phép | Tình trạng OSI | Mục đích sử dụng |
+| :--- | :--- | :--- | :---: | :--- |
+| **Leaflet.js** | `1.9.4` | BSD 2-Clause | ✅ OSI Approved | Hiển thị bản đồ số tương tác |
+| **Tailwind CSS**| `3.x` | MIT License | ✅ OSI Approved | Khung giao diện responsive và dark-mode |
+| **Lucide Icons**| `Latest` | ISC License | ✅ OSI Approved | Hệ thống biểu tượng giao diện người dùng |
+| **Chart.js** | `4.4.1` | MIT License | ✅ OSI Approved | Biểu đồ trực quan hóa dữ liệu lượng mưa |
 
 ---
 
 ## 4. KẾT LUẬN THẨM ĐỊNH BẢN QUYỀN
 
-- Toàn bộ dự án NORTHSTAR **đạt chuẩn 100% Tiêu chí Phần mềm Mã nguồn mở OLP 2026**.
-- Không có sự xâm nhập của bất kỳ đoạn mã độc quyền, không có thành phần cào dữ liệu lậu, không có vi phạm bản quyền bên thứ ba.
-- Dự án sẵn sàng để đóng gói, phân phối và triển khai cho các cơ quan chính phủ và tổ chức phi lợi nhuận trên toàn thế giới.
+1. **Tính tương thích (License Compatibility):** 100% các thành phần phụ thuộc sử dụng giấy phép Permissive (MIT, BSD, ISC) hoàn toàn tương thích khi kết hợp dưới giấy phép **Apache License 2.0**.
+2. **Không có mã nguồn đóng:** Hệ thống không sử dụng bất kỳ thư viện thương mại, công cụ đóng gói đóng hoặc mã nguồn đã bị sửa đổi vi phạm bản quyền gốc.
+3. **Tuân thủ tiêu chí OLP PMNM:** Dự án đáp ứng 100% các tiêu chí khắt khe nhất về Phần mềm Nguồn mở theo chuẩn Quốc tế và Quy chế Olympic Tin học Sinh viên Việt Nam.
