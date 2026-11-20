@@ -23,7 +23,7 @@ OPEN_DATA_CATALOG = {
     "system": "NorthStar - Vietnam Disaster Intelligence & Multi-Hazard Response Ecosystem",
     "software_license": "Apache-2.0 License (100% Open Source Software)",
     "open_data_compliance": True,
-    "total_sources": 5,
+    "total_sources": 7,
     "sources": [
         {
             "id": "osm",
@@ -59,15 +59,37 @@ OPEN_DATA_CATALOG = {
             "usage_in_northstar": "Cung cấp bản đồ số ranh giới thủy văn, mạng lưới lưu vực sông Hồng - Thái Bình, vị trí các hồ chứa thủy điện (Hòa Bình, Tuyên Quang, Thác Bà) và vùng trũng thấp."
         },
         {
-            "id": "nchmf",
-            "name": "Trung tâm Dự báo Khí tượng Thủy văn Quốc gia (NCHMF)",
-            "organization": "Tổng cục Khí tượng Thủy văn - Bộ Tài nguyên và Môi trường Việt Nam",
-            "url": "https://nchmf.gov.vn",
-            "category": "Thông tin khí tượng, cấp độ rủi ro & báo động lũ",
-            "license": "Dữ liệu công ích (Nghị định 47/2020/NĐ-CP & Luật Tiếp cận thông tin 2016)",
-            "license_type": "Public Sector Information / Open Government Data",
+            "id": "openaq",
+            "name": "OpenAQ & Open-Meteo Air Quality Open Data Network",
+            "organization": "OpenAQ Community & Open-Meteo",
+            "url": "https://openaq.org",
+            "category": "Mạng lưới quan trắc chất lượng không khí & bụi mịn mở",
+            "license": "Creative Commons Attribution 4.0 International (CC-BY 4.0)",
+            "license_type": "Open Data (Tự do khai thác, chia sẻ và tích hợp)",
             "is_open_data": True,
-            "usage_in_northstar": "Cung cấp các mốc báo động lũ (Báo động 1, 2, 3) trên các trạm thủy văn Sông Hồng, Sông Thao, Sông Cầu, Sông Thương, Sông Lô, Sông Đáy và các bản tin cảnh báo lũ quét khẩn cấp."
+            "usage_in_northstar": "Cung cấp chỉ số US AQI, nồng độ bụi mịn PM2.5, PM10, khí CO, NO2 thời gian thực của 18 trạm quan trắc trên toàn Miền Bắc, đưa ra cảnh báo hô hấp và khuyến cáo y tế tức thì."
+        },
+        {
+            "id": "copernicus_glofas",
+            "name": "Copernicus GloFAS (Global Flood Awareness System)",
+            "organization": "European Centre for Medium-Range Weather Forecasts (ECMWF)",
+            "url": "https://www.globalfloods.eu",
+            "category": "Hệ thống cảnh báo sớm và dự báo lưu lượng lũ sông toàn cầu",
+            "license": "Copernicus Open Access Policy (Regulation EU No 377/2014)",
+            "license_type": "Open Satellite & Hydrological Data",
+            "is_open_data": True,
+            "usage_in_northstar": "Cung cấp mốc cảnh báo lũ, lưu lượng xả đáy và lưu lượng dòng chảy các lưu vực sông lớn (Sông Hồng, Sông Thao, Sông Lô) hoàn toàn trên chuẩn mở FOSS/OSI."
+        },
+        {
+            "id": "nasa_gpm",
+            "name": "NASA GPM (Global Precipitation Measurement)",
+            "organization": "NASA Earth Science Data Systems",
+            "url": "https://gpm.nasa.gov",
+            "category": "Dữ liệu vệ tinh đo lượng mưa toàn cầu mở",
+            "license": "NASA Open Data Policy (Free & Open Access)",
+            "license_type": "Public Open Data",
+            "is_open_data": True,
+            "usage_in_northstar": "Cung cấp dữ liệu tích lũy mưa vệ tinh IMERG viễn thám, hỗ trợ kiểm chứng độc lập trường mưa và bổ trợ mô hình dự báo ngập lụt đa nguồn."
         },
         {
             "id": "open_meteo",
