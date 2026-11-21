@@ -16,7 +16,7 @@
 | **Open-Meteo Weather API** | Open-Meteo GmbH | [open-meteo.com/en/terms](https://open-meteo.com/en/terms) | **Creative Commons CC-BY 4.0** | REST JSON API (Fair Use) | Cung cấp chuỗi số liệu lượng mưa thực tế theo giờ (mm/h), độ ẩm đất và dự báo thời tiết ngắn hạn nạp vào mô hình AI Gradient Boosting. |
 | **NASA GPM IMERG** | NASA Earth Science Data Systems | [gpm.nasa.gov/data](https://gpm.nasa.gov/data) | **NASA Open Data Policy** (Public Domain) | Earthdata / Open Data Products | Dữ liệu viễn thám không gian đo mưa đa vệ tinh phục vụ theo dõi mưa bão cực đoan trên diện rộng, đánh giá nguy cơ lũ quét và sạt lở đất vùng cao. |
 | **Copernicus Sentinel-1 SAR** | Cơ quan Vũ trụ Châu Âu (ESA) | [dataspace.copernicus.eu](https://dataspace.copernicus.eu) | **EU Open Access Policy** | Copernicus Data Space OData API | Radar khẩu độ tổng hợp C-band SAR có khả năng xuyên qua mây mù, mưa bão 24/7 để phân tích vết ngập nước (Water Inundation Mask) và khoanh vùng bán kính nguy hiểm. |
-| **Open Development Mekong (ODM)** | East-West Management Institute | [vietnam.opendevelopmentmekong.net](https://data.vietnam.opendevelopmentmekong.net) | **Creative Commons CC-BY 4.0** | CKAN Open Data API | Bộ dữ liệu địa lý không gian mở về ranh giới lưu vực sông, hệ thống đê điều và vị trí các hồ chứa thủy điện lớn tại Việt Nam. |
+| **OpenAQ Air Quality Network** | OpenAQ Community & Open-Meteo | [openaq.org](https://openaq.org) | **Creative Commons CC-BY 4.0** | REST JSON API | Mạng lưới trạm quan trắc chỉ số US AQI, bụi mịn PM2.5, PM10 thời gian thực cho 26 tỉnh thành miền Bắc. |
 
 ---
 

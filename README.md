@@ -181,11 +181,10 @@ OK
 
 ## 🌍 6. Nguồn Dữ liệu Mở & Tính Pháp lý Bản quyền (Open Data Compliance)
 
-Hệ thống tuân thủ nghiêm ngặt nguyên tắc **100% Open Data & Open Source** (Tuyệt đối không cào web lậu, không sử dụng API đóng, không phụ thuộc cổng KTTV Quốc gia NCHMF), tra cứu minh bạch qua `GET /api/data-sources`:
+Hệ thống tuân thủ nghiêm ngặt nguyên tắc **100% Open Data & Open Source** (Chuẩn mở quốc tế FOSS/OSI, tuyệt đối không cào web lậu, không sử dụng API đóng), tra cứu minh bạch qua `GET /api/data-sources`:
 - **[OpenStreetMap (OSM)](https://www.openstreetmap.org)**: Giấy phép ODbL 1.0 (Open Data) - Mạng lưới giao thông và không gian đô thị.
 - **[Copernicus Sentinel-1 SAR](https://dataspace.copernicus.eu)**: EU Copernicus Open Access Policy - Viễn thám radar vệ tinh xuyên mây bão bóc tách vết ngập bề mặt 24/7.
 - **[Copernicus GloFAS (Global Flood Awareness System)](https://www.globalfloods.eu)**: EU Copernicus Policy - Cảnh báo lũ sớm, lưu lượng xả đáy và dòng chảy sông ngòi quốc tế.
-- **[Open Development Mekong (ODM)](https://data.vietnam.opendevelopmentmekong.net)**: Giấy phép CC-BY 4.0 - Thủy văn sông ngòi, lưu vực sông Hồng - Thái Bình và hồ chứa thủy điện.
 - **[Open-Meteo Weather API](https://open-meteo.com)**: Giấy phép CC-BY 4.0 - Dự báo nhiệt độ, sức gió và lượng mưa thời gian thực.
 - **[OpenAQ Air Quality Network](https://openaq.org)**: Giấy phép CC-BY 4.0 - Mạng lưới 18 trạm quan trắc chất lượng không khí, chỉ số US AQI, bụi mịn PM2.5, PM10, CO, NO₂.
 - **[NASA GPM IMERG](https://gpm.nasa.gov)**: NASA Open Data Policy - Đo lượng mưa vệ tinh viễn thám mở toàn cầu.

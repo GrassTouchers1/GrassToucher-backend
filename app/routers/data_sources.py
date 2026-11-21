@@ -23,7 +23,7 @@ OPEN_DATA_CATALOG = {
     "system": "NorthStar - Vietnam Disaster Intelligence & Multi-Hazard Response Ecosystem",
     "software_license": "Apache-2.0 License (100% Open Source Software)",
     "open_data_compliance": True,
-    "total_sources": 7,
+    "total_sources": 6,
     "sources": [
         {
             "id": "osm",
@@ -46,17 +46,6 @@ OPEN_DATA_CATALOG = {
             "license_type": "Open Satellite Data (Toàn diện, miễn phí và mở)",
             "is_open_data": True,
             "usage_in_northstar": "Vệ tinh radar băng C (SAR) xuyên mây bão 24/7, bóc tách vết ngập bề mặt (Water Inundation Mask) phục vụ xác định bán kính vùng ngập và sạt trượt nguy hiểm."
-        },
-        {
-            "id": "opendevelopment_mekong",
-            "name": "Open Development Mekong (ODM)",
-            "organization": "Open Development Initiative (ODI)",
-            "url": "https://data.vietnam.opendevelopmentmekong.net",
-            "category": "Dữ liệu sông ngòi, lưu vực nước và môi trường",
-            "license": "Creative Commons Attribution 4.0 International (CC-BY 4.0)",
-            "license_type": "Open Data (Được phép sao chép, phân phối và biến đổi)",
-            "is_open_data": True,
-            "usage_in_northstar": "Cung cấp bản đồ số ranh giới thủy văn, mạng lưới lưu vực sông Hồng - Thái Bình, vị trí các hồ chứa thủy điện (Hòa Bình, Tuyên Quang, Thác Bà) và vùng trũng thấp."
         },
         {
             "id": "openaq",
