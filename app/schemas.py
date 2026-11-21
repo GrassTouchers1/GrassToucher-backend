@@ -71,8 +71,31 @@ class ReportClear(BaseModel):
 
 
 class LngLat(BaseModel):
-    lng: float = Field(ge=-180, le=180)
+    lng: Optional[float] = Field(default=None, ge=-180, le=180)
     lat: float = Field(ge=-90, le=90)
+    lon: Optional[float] = Field(default=None, ge=-180, le=180)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_coords(cls, data):
+        if isinstance(data, (list, tuple)) and len(data) >= 2:
+            return {"lng": float(data[0]), "lat": float(data[1]), "lon": float(data[0])}
+        if isinstance(data, dict):
+            if "lng" not in data and "lon" in data:
+                data["lng"] = data["lon"]
+            elif "lon" not in data and "lng" in data:
+                data["lon"] = data["lng"]
+            if data.get("lng") is None and data.get("lon") is not None:
+                data["lng"] = data["lon"]
+        return data
+
+    @model_validator(mode="after")
+    def ensure_lng(self):
+        if self.lng is None and self.lon is not None:
+            self.lng = self.lon
+        if self.lng is None:
+            raise ValueError("Cần cung cấp kinh độ (lng hoặc lon)")
+        return self
 
 
 class RouteRequest(BaseModel):

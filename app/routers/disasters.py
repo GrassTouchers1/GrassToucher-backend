@@ -120,6 +120,12 @@ def create_disaster(body: DisasterCreate):
         return _to_feature(saved)
 
 
+@router.get("/alerts")
+def get_disaster_alerts():
+    """Lấy danh sách các sự kiện thiên tai và vùng nguy hiểm đang kích hoạt cảnh báo."""
+    return list_disasters(hazard_type=None, active_only=True)
+
+
 @router.get("/{disaster_id}")
 def get_disaster(disaster_id: int):
     """Chi tiết sự kiện thiên tai theo ID."""

@@ -110,10 +110,14 @@ def create_shelter(body: ShelterCreate):
 
 @router.get("/nearest")
 def get_nearest_shelter(
-    lng: float = Query(..., ge=-180, le=180, description="Kinh độ hiện tại"),
+    lng: Optional[float] = Query(None, ge=-180, le=180, description="Kinh độ hiện tại"),
+    lon: Optional[float] = Query(None, ge=-180, le=180, description="Kinh độ hiện tại (alias lon)"),
     lat: float = Query(..., ge=-90, le=90, description="Vĩ độ hiện tại"),
 ):
     """Tìm điểm sơ tán mở cửa còn chỗ tiếp nhận gần nhất với toạ độ người dùng."""
+    target_lng = lng if lng is not None else lon
+    if target_lng is None:
+        raise HTTPException(422, "Vui lòng cung cấp kinh độ (lng hoặc lon)")
     try:
         with get_db_connection() as conn:
             row = conn.execute("""
@@ -124,7 +128,7 @@ def get_nearest_shelter(
                 WHERE status = 'open' AND current_occupancy < capacity
                 ORDER BY dist_m ASC
                 LIMIT 1
-            """, (lng, lat)).fetchone()
+            """, (target_lng, lat)).fetchone()
             if row:
                 feat = _to_feature(row)
                 feat["properties"]["distance_m"] = round(float(row["dist_m"]), 1)
@@ -139,7 +143,7 @@ def get_nearest_shelter(
 
     def calc_dist(s):
         # Tính khoảng cách Euclidean xấp xỉ mét
-        dx = (s["lng"] - lng) * 103000
+        dx = (s["lng"] - target_lng) * 103000
         dy = (s["lat"] - lat) * 111000
         return math.hypot(dx, dy)
 
