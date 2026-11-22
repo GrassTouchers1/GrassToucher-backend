@@ -273,25 +273,80 @@ class MockAIProvider(AIProvider):
                 "2. Tránh xa các vách taluy đất dựng đứng đã no nước mưa nhiều ngày.\n"
                 "3. Di chuyển ngay vào các điểm sơ tán kiên cố đã được định vị an toàn."
             )
-            actions.append(SuggestedAction(label="🛡️ Xem trạm sơ tán gần nhất", action="switch_tab", tab="evac"))
+            actions.append(SuggestedAction(label="🛡️ Xem trạm sơ tán gần nhất", action="switch_tab", tab="rescue"))
 
-        elif any(k in msg for k in ["đường nào", "ngập không", "đi được không", "xe máy", "ô tô", "lộ trình"]):
+        elif any(k in msg for k in ["nước", "lọc", "uống", "khát", "cô lập", "vệ sinh"]):
             reply = (
-                "📍 **TRA CỨU GIAO THÔNG & ĐIỀU TIẾT PHƯƠNG TIỆN:**\n"
-                "- Xe máy: Cấm triệt để khi điểm ngập ≥ 20 cm (tránh nước vào bầu lọc gió, chết máy trôi xe).\n"
-                "- Ô tô con: Cấm triệt để khi điểm ngập ≥ 30 cm (nguy cơ thủy kích vỡ lốc máy).\n\n"
-                "💡 Thuật toán $A^*$ trên NorthStar tự động định tuyến phạt chi phí và né hoàn toàn các điểm ngập nguy hiểm."
+                "💧 **HƯỚNG DẪN XỬ LÝ & LỌC NƯỚC UỐNG SINH TỒN (Bộ Y tế & PCTT):**\n"
+                "1. Tuyệt đối KHÔNG uống trực tiếp nước lũ vì nguy cơ nhiễm khuẩn E.coli và hóa chất độc hại.\n"
+                "2. Thu hứng nước mưa từ mái sạch làm nguồn nước uống ưu tiên hàng đầu.\n"
+                "3. Làm trong nước: Dùng vải sạch nhiều lớp lọc cặn, hoặc dùng phèn chua (1g phèn chua cho 20 lít nước), khuấy đều và chờ lắng cặn 30 phút.\n"
+                "4. Khử khuẩn: Đun sôi liên tục tối thiểu 3 - 5 phút hoặc sử dụng viên Cloramin B được cấp phát (1 viên 0.25g cho 25 lít nước)."
             )
-            actions.append(SuggestedAction(label="🧭 Mở Tìm đường Né ngập", action="switch_tab", tab="route"))
+            actions.append(SuggestedAction(label="🆘 Gửi tín hiệu cần cứu trợ", action="open_sos"))
 
-        elif any(prov in msg for prov in ["thái nguyên", "lào cai", "yên bái", "hà nội", "phú thọ"]):
+        elif any(k in msg for k in ["sos", "cứu", "khẩn cấp", "mắc kẹt", "chìm", "giúp", "kêu cứu", "nguy cấp"]):
             reply = (
-                f"🛰️ **DỮ LIỆU ĐỊA BÀN THỜI GIAN THỰC ({msg.title()}):**\n"
-                f"- Các trạm đo đang được cập nhật liên tục qua cảm biến IoT và ảnh vệ tinh SAR Sentinel-1.\n"
-                f"- Hệ thống có {len(shelters)} điểm sơ tán mở cửa tiếp nhận nhân dân và {len(live_pts)} trạm quan trắc tự động.\n"
-                f"- Vui lòng kích hoạt chế độ **Bản đồ Vệ tinh / Lũ lụt** để quan sát vùng rủi ro."
+                "🆘 **HỖ TRỢ CỨU HỘ & ỨNG PHÓ KHẨN CẤP 24/7:**\n"
+                "1. Tổng đài khẩn cấp quốc gia: **114** (Cứu nạn cứu hộ) hoặc **112** (Cứu nạn thiên tai).\n"
+                "2. Giữ bình tĩnh, đưa người già và trẻ nhỏ lên vị trí cao nhất trong nhà (gác lửng, nóc nhà).\n"
+                "3. Nhấn ngay nút **'Gửi tín hiệu SOS khẩn cấp'** bên dưới để hệ thống lấy tọa độ GPS truyền trực tiếp về Trung tâm Chỉ huy Tác chiến."
             )
-            actions.append(SuggestedAction(label="🗺️ Xem Bản đồ Toàn cảnh", action="switch_tab", tab="overview"))
+            actions.append(SuggestedAction(label="🆘 Gửi tín hiệu SOS khẩn cấp", action="open_sos"))
+
+        elif any(k in msg for k in ["đường nào", "ngập không", "đi được không", "xe máy", "ô tô", "lộ trình", "tuyến", "cầu giấy", "láng hạ", "thái hà", "hà đông", "hoài đức", "xuân thủy", "mỹ đình", "phạm hùng", "nguyễn trãi", "đống đa", "ba đình", "hoàn kiếm", "ngập", "nước sâu"]):
+            # Tìm kiếm điểm ngập thực tế khớp với câu hỏi
+            matched_pts = []
+            keywords = ["cầu giấy", "láng hạ", "thái hà", "hà đông", "hoài đức", "xuân thủy", "mỹ đình", "phạm hùng", "nguyễn trãi", "đống đa", "ba đình", "hoàn kiếm", "tây hồ", "thanh xuân", "từ liêm", "đại lộ thăng long", "quốc oai"]
+            for p in live_pts:
+                pname = p.get("name", "").lower()
+                for kw in keywords:
+                    if kw in msg and kw in pname:
+                        matched_pts.append(p)
+                        break
+
+            if matched_pts:
+                lines = []
+                for p in matched_pts[:4]:
+                    d = p.get("depth_cm", 0.0)
+                    st = "Nguy hiểm (Né hoàn toàn)" if d >= 20 else ("Chú ý lội nhẹ" if d >= 5 else "Thông thoáng")
+                    lines.append(f"- **{p.get('name', 'Trạm ngập')}**: Mực nước ~{d}cm — *{st}*")
+                reply = (
+                    "📍 **TÌNH TRẠNG NGẬP LỤT THEO DỮ LIỆU CẢM BIẾN REAL-TIME:**\n"
+                    + "\n".join(lines)
+                    + "\n\n💡 *Khuyến nghị:* Thuật toán $A^*$ trên NorthStar tự động định tuyến phạt chi phí và né hoàn toàn các điểm ngập nguy hiểm trên."
+                )
+                actions.append(SuggestedAction(label="🧭 Tìm lộ trình né ngập tối ưu", action="switch_tab", tab="route"))
+            else:
+                reply = (
+                    "📍 **TRA CỨU GIAO THÔNG & ĐIỀU TIẾT PHƯƠNG TIỆN:**\n"
+                    "- Xe máy: Cấm triệt để khi điểm ngập ≥ 20 cm (tránh nước vào bầu lọc gió, chết máy trôi xe).\n"
+                    "- Ô tô con: Cấm triệt để khi điểm ngập ≥ 30 cm (nguy cơ thủy kích vỡ lốc máy).\n\n"
+                    f"💡 Hệ thống đang theo dõi {len(live_pts)} trạm quan trắc ngập lụt. Thuật toán $A^*$ trên NorthStar tự động định tuyến né hoàn toàn các điểm ngập nguy hiểm."
+                )
+                actions.append(SuggestedAction(label="🧭 Mở Tìm đường Né ngập", action="switch_tab", tab="route"))
+
+        elif any(prov in msg for prov in ["thái nguyên", "lào cai", "yên bái", "hà nội", "phú thọ", "phong châu", "bảo yên", "làng nủ"]):
+            lines = []
+            if "lào cai" in msg or "làng nủ" in msg or "bảo yên" in msg:
+                lines.append("- **Lào Cai / Làng Nủ (Bảo Yên):** Đang duy trì cảnh báo Lũ bùn quét cấp độ thảm họa. Trạm quan trắc ghi nhận nước lũ ~60cm, trạm sơ tán Tiểu học Bảo Yên đang mở cửa.")
+            if "yên bái" in msg:
+                lines.append("- **Yên Bái (Sông Thao):** Báo động lũ lịch sử vượt Báo động 3 (+55cm), khu vực ven sông Hồng ngập sâu. Khuyến cáo không lưu thông qua các tuyến ven đê.")
+            if "thái nguyên" in msg:
+                lines.append("- **Thái Nguyên (Sông Cầu):** Trạm Gia Bảy ghi nhận nước dâng 48cm. 3 trạm sơ tán đã mở cửa đón nhân dân tại Sân vận động và THPT Chuyên.")
+            if "phú thọ" in msg or "phong châu" in msg:
+                lines.append("- **Phú Thọ (Cầu Phong Châu):** Sự cố sập nhịp cầu Phong Châu, cấm mọi phương tiện qua lại, phân luồng sang cầu Ngọc Tháp và cầu Trung Hà.")
+            
+            if lines:
+                reply = "🛰️ **CẢNH BÁO THỜI GIAN THỰC VÙNG MIỀN BẮC:**\n" + "\n".join(lines)
+            else:
+                reply = (
+                    f"🛰️ **DỮ LIỆU ĐỊA BÀN THỜI GIAN THỰC ({msg.title()}):**\n"
+                    f"- Các trạm đo đang được cập nhật liên tục qua cảm biến IoT và ảnh vệ tinh SAR Sentinel-1.\n"
+                    f"- Hệ thống có {len(shelters)} điểm sơ tán mở cửa tiếp nhận nhân dân và {len(live_pts)} trạm quan trắc tự động.\n"
+                    f"- Vui lòng kích hoạt chế độ **Bản đồ Vệ tinh / Lũ lụt** để quan sát vùng rủi ro."
+                )
+            actions.append(SuggestedAction(label="🗺️ Xem Bản đồ Toàn cảnh", action="switch_tab", tab="weather"))
 
         else:
             reply = (
