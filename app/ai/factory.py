@@ -26,6 +26,7 @@ from .. import config
 from .base import AIProvider
 from .groq_provider import GroqProvider
 from .mock_provider import MockAIProvider
+from .qwen_provider import QwenProvider
 from .schemas import ProviderStatusResult
 
 
@@ -68,7 +69,14 @@ def get_ai_provider() -> AIProvider:
 
     provider_name = config.AI_PROVIDER.lower().strip()
 
-    if provider_name == "groq":
+    if provider_name == "qwen":
+        return QwenProvider(
+            api_base=config.QWEN_API_BASE,
+            api_key=config.QWEN_API_KEY,
+            model=config.QWEN_MODEL_NAME,
+            timeout_sec=config.QWEN_TIMEOUT_SEC
+        )
+    elif provider_name == "groq":
         return GroqProvider(
             api_key=config.GROQ_API_KEY,
             model=config.GROQ_MODEL,

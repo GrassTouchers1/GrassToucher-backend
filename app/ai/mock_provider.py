@@ -329,6 +329,197 @@ class MockAIProvider(AIProvider):
             is_fallback=True
         )
 
+    async def triage_relief_request(self, request, existing_requests=None):
+        """Phân loại yêu cầu cứu trợ bằng Rule Engine hoàn toàn ngoại tuyến."""
+        from .verification import ReliefVerificationEngine
+        from .guardrails import ReliefGuardrailsEngine
+        from .schemas import ReliefExtractedData, ReliefTriageResult, ReliefAuditEntry
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        req_id = request.request_id or f"NS-{int(datetime.now().timestamp() * 1000) % 1000000:06d}"
+        text = (request.message or "").lower()
+
+        missing = []
+        conflicts = []
+        reasons = []
+
+        people_count = None
+        p_match = re.search(r"(\d+)\s*(người|nhân khẩu|ng|bác|cháu|thành viên)", text)
+        if p_match:
+            people_count = int(p_match.group(1))
+        elif "gia đình" in text:
+            people_count = 4
+
+        # 2. Trích xuất mực nước
+        water_level_m = None
+        w_match = re.search(r"(\d+(?:\.\d+)?)\s*(m|mét|met|cm)", text)
+        if w_match:
+            val = float(w_match.group(1))
+            unit = w_match.group(2)
+            water_level_m = val / 100.0 if unit == "cm" else val
+        elif "nóc nhà" in text or "mái tôn" in text or "ngập tầng 2" in text:
+            water_level_m = 2.0
+            reasons.append("Người dân báo ngập đến nóc/tầng 2")
+        elif "ngang ngực" in text or "ngang người" in text:
+            water_level_m = 1.3
+        elif "đầu gối" in text or "ngang bắp chân" in text:
+            water_level_m = 0.4
+
+        # 3. Xu hướng nước
+        water_trend = "unknown"
+        if any(k in text for k in ["nước đang lên", "nước dâng", "dâng nhanh", "cuồn cuộn", "chảy xiết", "tràn vào"]):
+            water_trend = "rising"
+            reasons.append("Nước đang dâng nhanh")
+        elif any(k in text for k in ["rút dần", "đang rút", "rút bớt"]):
+            water_trend = "receding"
+        elif "ổn định" in text or "chững lại" in text:
+            water_trend = "stable"
+
+        # 4. Người dễ bị tổn thương
+        vulnerable = []
+        if any(k in text for k in ["cụ già", "người già", "bà già", "ông lão", "bà lão", "tai biến", "liệt"]):
+            vulnerable.append("elderly")
+        if any(k in text for k in ["trẻ nhỏ", "trẻ em", "em bé", "cháu nhỏ", "cháu bé", "trẻ con", "sơ sinh", "con nhỏ", "cháu"]):
+            vulnerable.append("children")
+        if any(k in text for k in ["mang bầu", "mang thai", "bầu bí", "sắp sinh"]):
+            vulnerable.append("pregnant")
+        if any(k in text for k in ["khuyết tật", "liệt giường", "chân đau không đi được"]):
+            vulnerable.append("disabled")
+
+        # 5. Khả năng tự thoát hiểm & Nguy hiểm tức thời
+        mobility_status = "unknown"
+        if any(k in text for k in ["trên mái", "nóc nhà", "mái tôn", "leo lên tum"]):
+            mobility_status = "trapped_roof"
+            reasons.append("Đang mắc kẹt trên mái nhà")
+        elif any(k in text for k in ["cô lập", "chia cắt", "không ra được", "mắc kẹt trong nhà"]):
+            mobility_status = "isolated"
+
+        # 6. Cấp cứu y tế & Nguy hiểm tức thời
+        medical_emergency = False
+        if any(k in text for k in ["cấp cứu", "mất máu", "chấn thương", "sốt cao", "co giật", "khó thở", "bệnh nhân", "thuốc trợ tim"]):
+            medical_emergency = True
+            reasons.append("Báo cáo có người cần trợ giúp y tế khẩn cấp")
+
+        immediate_danger = False
+        if mobility_status == "trapped_roof" or any(k in text for k in ["sắp sập", "sập nhà", "cuốn trôi", "chới với", "nguy kịch", "cứu gấp", "chết đuối", "chìm"]):
+            immediate_danger = True
+            reasons.append("Tình trạng đe dọa trực tiếp tính mạng")
+
+        mobility_status = "unknown"
+        if any(k in text for k in ["trên mái", "nóc nhà", "mái tôn", "leo lên tum"]):
+            mobility_status = "trapped_roof"
+            reasons.append("Đang mắc kẹt trên mái nhà")
+        elif any(k in text for k in ["cô lập", "chia cắt", "không ra được", "mắc kẹt trong nhà"]):
+            mobility_status = "isolated"
+
+        needs = []
+        if any(k in text for k in ["xuồng", "thuyền", "ca nô", "di tản", "sơ tán"]):
+            needs.append("boat_evacuation")
+        if any(k in text for k in ["lương thực", "nước uống", "đói", "sữa", "mì tôm", "cơm"]):
+            needs.append("food_water")
+        if any(k in text for k in ["phao", "áo phao"]):
+            needs.append("lifejacket")
+        if medical_emergency:
+            needs.append("medical_kit")
+
+        raw_priority = "P3"
+        if immediate_danger or medical_emergency or mobility_status == "trapped_roof" or (water_trend == "rising" and water_level_m and water_level_m >= 1.0):
+            raw_priority = "P1"
+        elif len(vulnerable) > 0 or water_trend == "rising" or (water_level_m and water_level_m >= 0.6) or mobility_status == "isolated":
+            raw_priority = "P2"
+        elif not needs:
+            raw_priority = "P4"
+
+        if not request.location_text and request.lat is None:
+            missing.append("vị trí / tọa độ")
+        if people_count is None:
+            missing.append("số lượng người cụ thể")
+        if water_level_m is None:
+            missing.append("mực nước ngập đo lường")
+
+        extracted = ReliefExtractedData(
+            request_id=req_id,
+            location_text=request.location_text,
+            lat=request.lat,
+            lng=request.lng,
+            people_count=people_count,
+            water_level_m=water_level_m,
+            water_trend=water_trend,
+            vulnerable_people=vulnerable,
+            medical_emergency=medical_emergency,
+            immediate_danger=immediate_danger,
+            mobility_status=mobility_status,
+            relief_needs=needs,
+            contact_name=request.contact_name,
+            contact_phone=request.phone,
+            citizen_reported_facts={"raw_message": request.message},
+            ai_inferred_facts={"rule_derived": True},
+            raw_ai_priority=raw_priority,
+            ai_priority_reasons=reasons,
+            missing_information=missing,
+            conflicting_information=conflicts
+        )
+
+        verification = ReliefVerificationEngine.verify_request(
+            extracted=extracted,
+            source=request.source,
+            existing_requests=existing_requests
+        )
+
+        (
+            final_priority,
+            priority_reasons,
+            guardrails_applied,
+            was_downgrade_prevented,
+            requires_human_review
+        ) = ReliefGuardrailsEngine.evaluate_priority(
+            extracted=extracted,
+            verification=verification
+        )
+
+        audit_history = [
+            ReliefAuditEntry(
+                timestamp=now_iso,
+                actor="mock_rule_engine",
+                action="created",
+                new_priority=raw_priority,
+                reason="Rule Engine trích xuất ngoại tuyến"
+            )
+        ]
+        if was_downgrade_prevented:
+            audit_history.append(
+                ReliefAuditEntry(
+                    timestamp=now_iso,
+                    actor="business_guardrails",
+                    action="rule_override",
+                    old_priority=raw_priority,
+                    new_priority=final_priority,
+                    reason=f"Kích hoạt bảo vệ: {', '.join(guardrails_applied)}"
+                )
+            )
+
+        status = "awaiting_dispatch"
+        if verification.verification_status == "needs_verification" and final_priority in ("P3", "P4"):
+            status = "needs_verification"
+
+        return ReliefTriageResult(
+            request_id=req_id,
+            extracted=extracted,
+            verification=verification,
+            final_priority=final_priority,
+            priority_reasons=priority_reasons,
+            guardrails_applied=guardrails_applied,
+            was_downgrade_prevented=was_downgrade_prevented,
+            requires_human_review=requires_human_review,
+            confidence_score=0.88,
+            status=status,
+            created_at=now_iso,
+            updated_at=now_iso,
+            override_history=audit_history,
+            provider_used="mock_offline",
+            is_fallback=True
+        )
+
     async def get_status(self) -> ProviderStatusResult:
         return ProviderStatusResult(
             enabled=True,

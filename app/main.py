@@ -41,6 +41,7 @@ from .routers import (
     rescue_dispatch,
     ai_endpoints,
     sitrep,
+    relief_triage,
 )
 
 app = FastAPI(
@@ -79,6 +80,7 @@ app.include_router(simulation.router)
 app.include_router(rescue_dispatch.router)
 app.include_router(ai_endpoints.router)
 app.include_router(sitrep.router)
+app.include_router(relief_triage.router)
 
 
 @app.get("/", include_in_schema=False)

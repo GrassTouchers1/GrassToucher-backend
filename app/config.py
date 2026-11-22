@@ -42,10 +42,18 @@ MAX_SNAP_M = core_config.MAX_SNAP_M
 # Tham số nghiệp vụ cảm biến Backend
 SENSOR_STALE_HOURS = 24
 
-# Cấu hình AI Provider (Groq / Local / Mock fallback)
+# Cấu hình AI Provider (Groq / Qwen / Local / Mock fallback)
 AI_PROVIDER = os.getenv("AI_PROVIDER", "groq").lower().strip()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
 AI_ENABLED = os.getenv("AI_ENABLED", "true").lower().strip() in ("true", "1", "yes", "on")
 AI_TIMEOUT_SEC = float(os.getenv("AI_TIMEOUT_SEC", "12.0"))
+
+# Cấu hình Mô hình Qwen3-8B (HuggingFace: Qwen/Qwen3-8B)
+# Tương thích chuẩn OpenAI API (vLLM, Ollama, LM Studio, TGI)
+QWEN_API_BASE = os.getenv("QWEN_API_BASE", "http://localhost:8000/v1").rstrip("/")
+QWEN_API_KEY = os.getenv("QWEN_API_KEY", "EMPTY").strip()
+QWEN_MODEL_NAME = os.getenv("QWEN_MODEL_NAME", "Qwen/Qwen3-8B").strip()
+QWEN_TIMEOUT_SEC = float(os.getenv("QWEN_TIMEOUT_SEC", "15.0"))
+
 
