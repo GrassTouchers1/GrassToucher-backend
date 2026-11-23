@@ -241,6 +241,53 @@ class MockAIProvider(AIProvider):
             is_fallback=True
         )
 
+    def _general_survival_guide(self) -> str:
+        """Cẩm nang sinh tồn tổng quát và quy tắc sống còn trong bão lũ & cô lập."""
+        return (
+            "🧭 **CẨM NANG HÀNH ĐỘNG SINH TỒN TRONG BÃO LŨ & CÔ LẬP:**\n\n"
+            "1. ⏱️ **QUY TẮC SỐNG CÒN 3-3-3:**\n"
+            "- Con người chỉ có thể chịu đựng: **3 phút** thiếu oxy, **3 ngày** thiếu nước uống, và **3 tuần** thiếu thức ăn.\n"
+            "- *Thứ tự ưu tiên sống còn: Vị trí trú ẩn cao ráo, an toàn điện > Nước uống sạch > Giữ ấm cơ thể > Khẩu phần lương thực > Tín hiệu kêu cứu.*\n\n"
+            "2. 🛡️ **4 BƯỚC HÀNH ĐỘNG CẤP BÁCH ĐỂ SỐNG SÓT:**\n"
+            "- ⚡ **Bước 1 - Ngắt điện & Lên cao:** Cắt ngay cầu dao/aptomat tổng khi nước mấp mé vào nhà. Di chuyển người già, trẻ nhỏ lên gác xép, tầng thượng hoặc vị trí cao nhất.\n"
+            "- 💧 **Bước 2 - Đảm bảo nguồn nước:** Hứng nước mưa sạch vào xô chậu dự trữ. Tuyệt đối KHÔNG uống trực tiếp nước lũ vì nguy cơ nhiễm khuẩn E.coli và hóa chất độc hại. Đun sôi hoặc lọc qua vải sạch.\n"
+            "- 🌾 **Bước 3 - Tiết kiệm lương thực:** Kê cao bao/can gạo tránh ẩm mốc. Nấu cháo thật loãng để vừa cấp nước vừa duy trì calo; tránh ăn đồ khô mặn gây khát nước.\n"
+            "- 🆘 **Bước 4 - Phát tín hiệu kêu cứu:** Treo mảnh vải sáng màu (đỏ/vàng) lên vị trí cao. Dùng đèn pin hoặc còi phát tín hiệu SOS (3 ngắn - 3 dài - 3 ngắn). Bấm nút SOS bên dưới để truyền tọa độ GPS về Trung tâm Chỉ huy."
+        )
+
+    def _preparedness_and_gobag_guide(self) -> str:
+        """Hướng dẫn chuẩn bị túi đồ cứu sinh khẩn cấp (Go-Bag) trước và trong bão lũ."""
+        return (
+            "🎒 **DANH MỤC TÚI ĐỒ CỨU SINH KHẨN CẤP (GO-BAG):**\n\n"
+            "Mỗi gia đình nên chuẩn bị sẵn 1 ba lô chống nước đặt cạnh lối thoát hiểm:\n"
+            "1. 📄 **Giấy tờ quan trọng:** Cho vào túi zip bọc kín chống ướt (CCCD, thẻ BHYT, sổ hộ khẩu, giấy khai sinh).\n"
+            "2. 💧 **Nước & Lương thực khẩn cấp:** 2 - 3 chai nước suối 500ml/người, lương khô dinh dưỡng, bánh quy ngọt, sữa hộp tiệt trùng.\n"
+            "3. 💊 **Túi y tế cá nhân:** Bông băng gạc, cồn đỏ sát khuẩn, thuốc hạ sốt (Paracetamol), men tiêu hóa/Oresol bù nước, thuốc đặc trị cho người già/bệnh mạn tính.\n"
+            "4. 🔦 **Dụng cụ sinh tồn:** Đèn pin siêu sáng, pin sạc dự phòng điện thoại (đã nạp đầy), còi cứu hộ, bật lửa/diêm chống ẩm, áo mưa bộ, dao đa năng."
+        )
+
+    def _rescue_signaling_guide(self) -> str:
+        """Hướng dẫn phát tín hiệu cầu cứu hiệu quả ban ngày và ban đêm."""
+        return (
+            "📡 **HƯỚNG DẪN PHÁT TÍN HIỆU CẦU CỨU & RA HIỆU CHO ĐỘI CỨU HỘ:**\n\n"
+            "1. ☀️ **Ban ngày (Tín hiệu thị giác & âm thanh):**\n"
+            "- Buộc tấm vải màu nổi bật (đỏ, cam, vàng) hoặc áo phao lên sào/gậy dài vẫy liên tục từ nóc nhà.\n"
+            "- Thổi còi cứu nạn ngắt quãng từng hồi để âm thanh vang xa qua tiếng mưa gió lũ.\n\n"
+            "2. 🌙 **Ban đêm (Tín hiệu ánh sáng SOS quốc tế):**\n"
+            "- Dùng đèn pin hoặc đèn flash điện thoại nháy theo mã Morse SOS: **3 chớp ngắn - 3 chớp dài - 3 chớp ngắn**.\n"
+            "- Chiếu luồng sáng quét theo hình nan quạt về hướng ca nô hoặc trực thăng cứu hộ.\n\n"
+            "3. 📱 **Tín hiệu số:** Bật định vị GPS trên điện thoại và bấm **'Phát tín hiệu SOS'** trên NorthStar để tọa độ truyền thẳng vào bản đồ tác chiến của Ban Chỉ huy."
+        )
+
+    def _post_flood_health_guide(self) -> str:
+        """Hướng dẫn phòng chống dịch bệnh và vệ sinh nguồn nước sau khi nước lũ rút."""
+        return (
+            "🏥 **PHÒNG CHỐNG DỊCH BỆNH & VỆ SINH SAU LŨ (Bộ Y tế):**\n\n"
+            "1. 🦶 **Phòng ngừa nước ăn chân (Nấm kẽ chân):** Rửa chân bằng nước sạch ngay sau khi lội nước lũ, lau thật khô các kẽ ngón chân; bôi thuốc mỡ kháng nấm (như Ketoconazole, cồn BSI).\n"
+            "2. 🦟 **Phòng sốt xuất huyết & tiêu chảy:** Thu gom rác thải, khơi thông cống rãnh tránh nước đọng sinh lăng quăng/bọ gậy. Thực hiện ăn chín, uống sôi tuyệt đối.\n"
+            "3. 🧪 **Thau rửa & Khử trùng giếng nước:** Sau khi nước rút, tát cạn nước đục, nạo vét bùn đáy giếng, sau đó dùng Cloramin B (10 - 20g bột/m³ nước) để khử trùng trước khi sử dụng lại."
+        )
+
     def _estimate_food_survival(self, msg: str) -> str:
         """Ước tính thời gian duy trì sự sống dựa trên lượng gạo/lương thực hiện có."""
         can_match = re.search(r"(\d+)\s*(can|thùng|bao|kg|kí|ký|gói|bát|bò)?\s*(gạo|lương thực|mì|mỳ)", msg)
@@ -321,10 +368,46 @@ class MockAIProvider(AIProvider):
             )
             actions.append(SuggestedAction(label="🆘 Ưu tiên cứu hộ khẩn cấp", action="open_sos"))
 
-        # 4. Câu hỏi về Lương thực / Thực phẩm / Gạo / Mì tôm / Thời gian sinh tồn
-        elif any(k in msg for k in ["gạo", "lương thực", "mì tôm", "mỳ tôm", "thức ăn", "thực phẩm", "nhịn ăn", "đói", "tồn tại", "sống sót", "cầm cự", "bao nhiêu ngày", "bao lâu"]):
+        # 4A. Câu hỏi cụ thể về Lương thực / Gạo / Mì tôm / Thời gian cầm cự theo số lượng
+        elif any(k in msg for k in ["gạo", "mì tôm", "mỳ tôm", "lương thực", "can gạo", "bao gạo", "gói mì", "thức ăn", "thực phẩm", "nhịn ăn", "đói", "cầm cự"]):
             reply = self._estimate_food_survival(msg)
             actions.append(SuggestedAction(label="🆘 Gửi tín hiệu cần tiếp tế lương thực", action="open_sos"))
+
+        # 4B. Cẩm nang sinh tồn tổng quát: Cần làm gì để sống / Kỹ năng sống còn khi bị cô lập
+        elif any(k in msg for k in [
+            "để sống", "làm gì để sống", "cần làm gì để sống", "làm sao để sống",
+            "cách sinh tồn", "kỹ năng sinh tồn", "kỹ năng sống", "bí quyết sinh tồn",
+            "kinh nghiệm sinh tồn", "làm thế nào để sống", "sống sót qua", "sống sót",
+            "sinh tồn", "cô lập", "sống thế nào"
+        ]) or ("sống" in msg and any(w in msg for w in ["làm gì", "cần làm", "làm sao", "thế nào", "cách", "hướng dẫn"])):
+            reply = self._general_survival_guide()
+            actions.append(SuggestedAction(label="🆘 Gửi tín hiệu SOS khẩn cấp", action="open_sos"))
+            actions.append(SuggestedAction(label="🛡️ Xem trạm sơ tán gần nhất", action="switch_tab", tab="evac"))
+
+        # 4C. Chuẩn bị trước thiên tai & Túi đồ cứu sinh khẩn cấp (Go-Bag)
+        elif any(k in msg for k in [
+            "chuẩn bị gì", "cần mang gì", "mang theo gì", "túi cứu sinh", "ba lô cứu sinh",
+            "go bag", "dự trữ gì", "vật dụng cần thiết", "đồ đạc cần mang", "túi khẩn cấp", "sơ tán mang gì"
+        ]):
+            reply = self._preparedness_and_gobag_guide()
+            actions.append(SuggestedAction(label="🛡️ Xem trạm sơ tán an toàn", action="switch_tab", tab="evac"))
+            actions.append(SuggestedAction(label="🧭 Mở Tìm đường Né ngập", action="switch_tab", tab="route"))
+
+        # 4D. Tín hiệu phát cầu cứu ban ngày & ban đêm cho đội cứu hộ
+        elif any(k in msg for k in [
+            "tín hiệu", "báo hiệu", "kêu cứu ban đêm", "cho cứu hộ thấy", "ra hiệu",
+            "còi cứu hộ", "cầu cứu ban đêm", "đèn pin báo hiệu"
+        ]):
+            reply = self._rescue_signaling_guide()
+            actions.append(SuggestedAction(label="🆘 Phát tín hiệu SOS khẩn cấp", action="open_sos"))
+
+        # 4E. Vệ sinh sau lũ, phòng ngừa dịch bệnh & nước ăn chân
+        elif any(k in msg for k in [
+            "nước ăn chân", "dịch bệnh", "ghẻ lở", "ô nhiễm", "khử trùng môi trường",
+            "vệ sinh sau lũ", "dọn bùn", "rác thải", "khử trùng giếng"
+        ]):
+            reply = self._post_flood_health_guide()
+            actions.append(SuggestedAction(label="🏥 Yêu cầu hỗ trợ y tế", action="open_sos"))
 
         # 5. Câu hỏi về An toàn điện khi ngập
         elif "điện" in msg or "giật" in msg or "cầu dao" in msg or "aptomat" in msg:
@@ -419,11 +502,13 @@ class MockAIProvider(AIProvider):
                 f"🤖 **Trợ lý AI Trực ban Thiên tai NorthStar (Ngoại tuyến):**\n"
                 f"Tôi đã tiếp nhận câu hỏi của bạn: *\"{query}\"*.\n\n"
                 f"Hiện tại hệ thống đang vận hành ở chế độ dự phòng bảo toàn ngoại tuyến. Tôi có thể hỗ trợ bạn trực tiếp:\n"
-                f"• 🌾 **Ước tính lương thực & sinh tồn:** Nhập lượng gạo, mì tôm để tính thời gian cầm cự và cách chia khẩu phần.\n"
+                f"• 🧭 **Cẩm nang sinh tồn:** Quy tắc sống còn 3-3-3, kỹ năng khi bị cô lập, túi cứu sinh Go-Bag.\n"
+                f"• 🌾 **Ước tính lương thực:** Nhập số can gạo, thùng mì tôm để tính số ngày cầm cự và cách chia khẩu phần.\n"
                 f"• 💧 **Xử lý nước sạch & an toàn điện:** Hướng dẫn lọc nước lũ, an toàn điện khi nước tràn vào nhà.\n"
-                f"• 🏥 **Y tế & Sơ cứu:** Xử lý rắn cắn, tiêu chảy, vết thương hở trong bão lũ.\n"
+                f"• 🏥 **Y tế & Sơ cứu:** Xử lý rắn cắn, tiêu chảy, vết thương hở trong bão lũ, phòng nước ăn chân.\n"
                 f"• 🛣️ **Tra cứu ngập lụt:** Kiểm tra tình trạng ngập cho bất kỳ tuyến đường nào (Cầu Giấy, Láng Hạ, Hà Đông, Hoài Đức...).\n"
-                f"• 🆘 **Cứu nạn khẩn cấp:** Kết nối đường dây nóng 114, 112 và chuyển phát tọa độ GPS về Ban Chỉ huy."
+                f"• 🆘 **Cứu nạn khẩn cấp:** Kết nối đường dây nóng 114, 112 và chuyển phát tọa độ GPS về Ban Chỉ huy.\n\n"
+                f"💡 *Mẹo mở khóa trò chuyện tự do:* Cấu hình `GROQ_API_KEY` trong tệp `.env` để kích hoạt siêu AI LLaMA 3.3 70B trả lời mọi chủ đề bằng ngôn ngữ tự nhiên."
             )
             actions.append(SuggestedAction(label="🧭 Mở Tìm đường Né ngập", action="switch_tab", tab="route"))
             actions.append(SuggestedAction(label="🆘 Phát tín hiệu SOS khẩn cấp", action="open_sos"))
