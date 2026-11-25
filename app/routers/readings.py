@@ -19,8 +19,9 @@ from datetime import datetime, timezone
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from ..auth import AuthUser, record_audit_event, require_roles
 from ..db import pool, get_db_connection
 from ..schemas import ReadingCreate
 from .flood_points import DEFAULT_FLOOD_POINTS
@@ -34,8 +35,12 @@ router = APIRouter(prefix="/api/readings", tags=["Số đo mực nước"])
 
 
 @router.post("", status_code=201)
-def create_reading(body: ReadingCreate):
-    """Cảm biến (hoặc script giả lập) gửi mực nước. Có thể dùng point_id hoặc sensor_id."""
+def create_reading(
+    body: ReadingCreate,
+    user: AuthUser = Depends(require_roles("coordinator", "admin")),
+):
+    """Cảm biến (hoặc cán bộ) gửi mực nước. Có thể dùng point_id hoặc sensor_id."""
+    record_audit_event("reading_created", "reading", str(body.point_id or body.sensor_id), "success", f"depth={body.depth_cm}", actor=user)
     try:
         with get_db_connection() as conn:
             if body.point_id is not None:
@@ -89,12 +94,15 @@ def create_reading(body: ReadingCreate):
 
 
 @router.post("/batch", status_code=201)
-def create_batch_readings(items: list[ReadingCreate]):
+def create_batch_readings(
+    items: list[ReadingCreate],
+    user: AuthUser = Depends(require_roles("coordinator", "admin")),
+):
     """Gửi hàng loạt số đo mực nước để mô phỏng kịch bản mưa bão nhanh."""
     results = []
     for item in items:
         try:
-            results.append(create_reading(item))
+            results.append(create_reading(item, user=user))
         except Exception:
             continue
     return {"count": len(results), "readings": results}

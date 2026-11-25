@@ -21,8 +21,9 @@ Hỗ trợ tìm điểm sơ tán gần nhất, kiểm tra sức chứa (capacity
 import math
 import logging
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from ..auth import AuthUser, record_audit_event, require_roles
 from ..db import get_db_connection
 from ..schemas import ShelterCreate
 from ..fallback_storage import get_fallback_shelters, save_fallback_shelter
@@ -88,8 +89,12 @@ def list_shelters(
 
 
 @router.post("", status_code=201)
-def create_shelter(body: ShelterCreate):
+def create_shelter(
+    body: ShelterCreate,
+    user: AuthUser = Depends(require_roles("coordinator", "admin")),
+):
     """Khai báo điểm sơ tán hoặc trạm cứu trợ mới."""
+    record_audit_event("shelter_created", "shelter", body.name, "success", None, actor=user)
     try:
         with get_db_connection() as conn:
             row = conn.execute("""

@@ -16,12 +16,17 @@
 
 """Báo cáo ngập của người dân (crowdsourcing) + logic xác nhận."""
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
 import logging
-from fastapi import APIRouter, HTTPException, Response
+import psycopg
+from fastapi import APIRouter, Depends, HTTPException, Response
 
+from ..auth import AuthUser, record_audit_event, require_roles
 from ..db import pool, get_db_connection
 from ..schemas import ReportClear, ReportCreate
 from ..fallback_storage import (
+    IdempotencyConflictError,
     save_fallback_report,
     get_fallback_reports,
     clear_fallback_reports,
@@ -47,16 +52,52 @@ POINT = "ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography"
 # Báo cáo dự phòng được chuyển sang lưu trữ bền vững tại fallback_storage.db
 
 
+def compute_report_payload_hash(body: ReportCreate) -> str:
+    canonical = {
+        "lng": body.lng,
+        "lat": body.lat,
+        "level": body.level,
+        "user_id": body.user_id,
+        "photo_url": body.photo_url,
+    }
+    raw = json.dumps(canonical, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 @router.post("", status_code=201)
 def create_report(body: ReportCreate):
+    payload_hash = compute_report_payload_hash(body) if body.client_event_id else None
     try:
         with get_db_connection() as conn:
-            rep = conn.execute(
-                """INSERT INTO reports (user_id, geom, level, photo_url)
-                   VALUES (%s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), %s::report_level, %s)
-                   RETURNING id, created_at, expires_at""",
-                (body.user_id, body.lng, body.lat, body.level, body.photo_url),
-            ).fetchone()
+            try:
+                rep = conn.execute(
+                    """INSERT INTO reports (user_id, geom, level, photo_url, client_event_id, payload_hash)
+                       VALUES (%s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), %s::report_level, %s, %s, %s)
+                       RETURNING id, created_at, expires_at""",
+                    (body.user_id, body.lng, body.lat, body.level, body.photo_url, body.client_event_id, payload_hash),
+                ).fetchone()
+            except psycopg.errors.UniqueViolation:
+                conn.rollback()
+                if not body.client_event_id:
+                    raise
+                existing = conn.execute(
+                    "SELECT id, level, confirmed, created_at, expires_at, payload_hash FROM reports WHERE client_event_id = %s",
+                    (body.client_event_id,),
+                ).fetchone()
+                if existing:
+                    if existing.get("payload_hash") and payload_hash and existing["payload_hash"] != payload_hash:
+                        raise HTTPException(409, "Xung đột dữ liệu: client_event_id báo ngập đã tồn tại với nội dung khác.")
+                    return {
+                        "id": existing["id"],
+                        "level": existing["level"],
+                        "confirmed": bool(existing["confirmed"]),
+                        "nearby_reports": 1,
+                        "need_more": 0,
+                        "expires_at": existing["expires_at"],
+                        "client_event_id": body.client_event_id,
+                        "idempotent_replay": True,
+                    }
+                raise
 
             # 1) Các báo cáo còn hiệu lực, gần nhau (kể cả báo cáo vừa gửi)
             nearby = conn.execute(
@@ -107,16 +148,25 @@ def create_report(body: ReportCreate):
             "nearby_reports": len(nearby_ids),
             "need_more": 0 if confirmed else CONFIRM_MIN_REPORTS - len(nearby_ids),
             "expires_at": rep["expires_at"],
+            "client_event_id": body.client_event_id,
+            "idempotent_replay": False,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         log.warning("DB query failed in create_report, using persistent fallback: %s", e)
-        return save_fallback_report(
-            user_id=body.user_id,
-            lng=body.lng,
-            lat=body.lat,
-            level=body.level,
-            photo_url=body.photo_url,
-        )
+        try:
+            return save_fallback_report(
+                user_id=body.user_id,
+                lng=body.lng,
+                lat=body.lat,
+                level=body.level,
+                photo_url=body.photo_url,
+                client_event_id=body.client_event_id,
+                payload_hash=payload_hash,
+            )
+        except IdempotencyConflictError:
+            raise HTTPException(409, "Xung đột dữ liệu: client_event_id báo ngập đã tồn tại với nội dung khác.")
 
 
 @router.get("")
@@ -176,8 +226,12 @@ def list_reports(only_confirmed: bool = False):
 
 
 @router.post("/clear")
-def clear_reports(body: ReportClear):
-    """Người dân báo 'đã hết ngập': hết hạn mọi báo cáo còn hiệu lực trong bán kính 100 m."""
+def clear_reports(
+    body: ReportClear,
+    user: AuthUser = Depends(require_roles("coordinator", "admin")),
+):
+    """Cán bộ xác nhận 'đã hết ngập': hết hạn mọi báo cáo còn hiệu lực trong bán kính 100 m."""
+    record_audit_event("reports_clear", "reports", f"{body.lng},{body.lat}", "success", None, actor=user)
     try:
         with get_db_connection() as conn:
             rows = conn.execute(
@@ -194,7 +248,11 @@ def clear_reports(body: ReportClear):
 
 
 @router.delete("/{report_id}", status_code=204)
-def delete_report(report_id: int):
+def delete_report(
+    report_id: int,
+    user: AuthUser = Depends(require_roles("coordinator", "admin")),
+):
+    record_audit_event("report_delete", "reports", str(report_id), "success", None, actor=user)
     try:
         with get_db_connection() as conn:
             row = conn.execute("DELETE FROM reports WHERE id = %s RETURNING id", (report_id,)).fetchone()

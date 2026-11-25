@@ -26,7 +26,9 @@ Tích hợp:
 
 import logging
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from ..auth import AuthUser, get_current_user_optional, record_audit_event, require_roles
 
 from ..ai.factory import get_ai_provider
 from ..ai.qwen_provider import QwenProvider
@@ -105,7 +107,10 @@ async def analyze_relief_request(body: ReliefRequestCreate) -> ReliefTriageResul
     status_code=status.HTTP_201_CREATED,
     summary="Tiếp nhận Yêu cầu Cứu trợ mới và Đưa vào Hàng chờ Điều phối"
 )
-async def create_relief_request(body: ReliefRequestCreate) -> ReliefTriageResult:
+async def create_relief_request(
+    body: ReliefRequestCreate,
+    user: Optional[AuthUser] = Depends(get_current_user_optional),
+) -> ReliefTriageResult:
     """
     Quy trình tiếp nhận chính thức:
     1. Trích xuất thông tin bằng mô hình Qwen3-8B (hoặc offline fallback).
@@ -123,8 +128,11 @@ async def create_relief_request(body: ReliefRequestCreate) -> ReliefTriageResult
         qwen = QwenProvider()
         result = await qwen.triage_relief_request(body, existing_requests=existing_requests)
 
-    # Lưu trữ bền vững
-    saved = save_fallback_relief_request(result.model_dump())
+    payload = result.model_dump()
+    if user:
+        payload["owner_user_id"] = user.id
+    saved = save_fallback_relief_request(payload)
+    record_audit_event("relief_request_created", "relief", saved.get("request_id"), "success", f"priority={saved.get('final_priority')}", actor=user)
     return ReliefTriageResult(**saved)
 
 
@@ -135,7 +143,8 @@ async def create_relief_request(body: ReliefRequestCreate) -> ReliefTriageResult
 def get_relief_dispatch_queue(
     priority: Optional[str] = Query(None, description="Lọc theo mức ưu tiên: P1, P2, P3, P4"),
     status: Optional[str] = Query(None, description="Lọc theo trạng thái: awaiting_dispatch, dispatched, on_scene, rescued, needs_verification"),
-    verification_status: Optional[str] = Query(None, description="Lọc theo cấp độ xác minh: structurally_valid, source_verified, content_verified, needs_verification, unverified")
+    verification_status: Optional[str] = Query(None, description="Lọc theo cấp độ xác minh: structurally_valid, source_verified, content_verified, needs_verification, unverified"),
+    user: AuthUser = Depends(require_roles("rescue", "coordinator", "admin")),
 ) -> Dict[str, Any]:
     """
     Trả về danh sách yêu cầu cứu trợ đã được sắp xếp chuẩn:
@@ -158,7 +167,10 @@ def get_relief_dispatch_queue(
     "/queue/{request_id}",
     summary="Xem chi tiết Yêu cầu Cứu trợ & Lịch sử Nhật ký Audit"
 )
-def get_relief_request_detail(request_id: str) -> Dict[str, Any]:
+def get_relief_request_detail(
+    request_id: str,
+    user: AuthUser = Depends(require_roles("rescue", "coordinator", "admin")),
+) -> Dict[str, Any]:
     """Lấy toàn bộ thông tin chi tiết: dữ liệu trích xuất, lý do phân loại và lịch sử điều chỉnh."""
     req = get_fallback_relief_request_by_id(request_id)
     if not req:
@@ -173,16 +185,21 @@ def get_relief_request_detail(request_id: str) -> Dict[str, Any]:
     "/queue/{request_id}/override",
     summary="Người Điều phối Điều chỉnh / Xác nhận Mức Ưu tiên (Kèm Audit Trail)"
 )
-def override_relief_priority(request_id: str, body: ReliefPriorityOverrideRequest) -> Dict[str, Any]:
+def override_relief_priority(
+    request_id: str,
+    body: ReliefPriorityOverrideRequest,
+    user: AuthUser = Depends(require_roles("coordinator", "admin")),
+) -> Dict[str, Any]:
     """
-    Cho phép điều phối viên can thiệp:
+    Cho phép điều phối viên hoặc admin can thiệp:
     - Xác nhận hoặc nâng/hạ mức ưu tiên dựa trên tình hình thực địa.
-    - Lưu bắt buộc: tên người thực hiện, thời điểm và lý do thay đổi vào nhật ký truy vết.
+    - Lưu bắt buộc: người thực hiện xác thực qua phiên đăng nhập, thời điểm và lý do thay đổi.
     """
+    actor_label = body.dispatcher_name or user.full_name
     updated = override_fallback_relief_priority(
         request_id=request_id,
         new_priority=body.new_priority,
-        dispatcher_name=body.dispatcher_name,
+        dispatcher_name=actor_label,
         reason=body.reason
     )
     if not updated:
@@ -190,6 +207,14 @@ def override_relief_priority(request_id: str, body: ReliefPriorityOverrideReques
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Không tìm thấy hoặc không thể cập nhật yêu cầu: {request_id}"
         )
+    record_audit_event(
+        "relief_priority_override",
+        "relief",
+        request_id,
+        "success",
+        f"new_priority={body.new_priority}; dispatcher={actor_label}; reason={body.reason}",
+        actor=user,
+    )
     return {
         "success": True,
         "message": f"Đã cập nhật mức ưu tiên của [{request_id}] thành {body.new_priority}",
@@ -201,7 +226,9 @@ def override_relief_priority(request_id: str, body: ReliefPriorityOverrideReques
     "/stats",
     summary="Thống kê Tổng hợp Hàng chờ Điều phối & Hoạt động AI"
 )
-def get_relief_statistics() -> Dict[str, Any]:
+def get_relief_statistics(
+    user: AuthUser = Depends(require_roles("rescue", "coordinator", "admin")),
+) -> Dict[str, Any]:
     """Báo cáo các chỉ số KPI: tổng số yêu cầu, số lượng theo P1/P2/P3/P4, số ca Guardrail can thiệp."""
     queue = get_fallback_relief_queue()
     p_counts = {"P1": 0, "P2": 0, "P3": 0, "P4": 0}

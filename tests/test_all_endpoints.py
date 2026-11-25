@@ -19,6 +19,7 @@ Bộ kiểm thử tự động (Unit Test & Benchmark) cho toàn bộ hệ thố
 Phụ trách chính: Thành viên 2 (Senior Backend)
 Chạy: python -m unittest discover -s tests
 """
+import os
 import time
 import unittest
 from fastapi.testclient import TestClient
@@ -185,8 +186,11 @@ class TestFloodNavBackend(unittest.TestCase):
         sos_id = data["properties"]["id"]
         self.assertEqual(data["properties"]["priority"], "critical")
 
-        # Update status
-        patch_res = self.client.patch(f"/api/sos/{sos_id}/status", json={"status": "dispatched"})
+        # Update status (authenticated as Coordinator via RBAC)
+        login_res = self.client.post("/api/auth/login", json={"username": "coordinator_demo", "password": os.getenv("NORTHSTAR_DEMO_PASSWORD", "NorthStarDemo@2026")})
+        self.assertEqual(login_res.status_code, 200)
+        headers = {"Authorization": f"Bearer {login_res.json()['access_token']}"}
+        patch_res = self.client.patch(f"/api/sos/{sos_id}/status", json={"status": "dispatched"}, headers=headers)
         self.assertEqual(patch_res.status_code, 200)
         self.assertEqual(patch_res.json()["properties"]["status"], "dispatched")
 

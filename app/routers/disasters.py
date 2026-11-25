@@ -20,8 +20,9 @@ Hỗ trợ các loại hình thiên tai: lũ lụt (flood), sạt lở (landslid
 """
 import logging
 from typing import Optional, Literal
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
+from ..auth import AuthUser, record_audit_event, require_roles
 from ..db import get_db_connection
 from ..schemas import DisasterCreate
 from ..fallback_storage import get_fallback_disasters, save_fallback_disaster
@@ -98,8 +99,12 @@ def list_disasters(
 
 
 @router.post("", status_code=201)
-def create_disaster(body: DisasterCreate):
+def create_disaster(
+    body: DisasterCreate,
+    user: AuthUser = Depends(require_roles("coordinator", "admin")),
+):
     """Khai báo sự kiện hoặc vùng cảnh báo thiên tai mới."""
+    record_audit_event("disaster_created", "disaster", body.title, "success", f"severity={body.severity}", actor=user)
     try:
         with get_db_connection() as conn:
             row = conn.execute("""

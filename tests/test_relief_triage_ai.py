@@ -38,6 +38,7 @@ Kiểm thử 10 kịch bản giả lập theo yêu cầu nhiệm vụ:
 
 import asyncio
 import json
+import os
 import unittest
 from unittest.mock import AsyncMock, patch
 
@@ -333,8 +334,15 @@ class TestReliefTriageAISystem(unittest.TestCase):
         req2_id = data2["request_id"]
         self.assertEqual(data2["final_priority"], "P3")
 
-        # 3. Lấy hàng chờ: P1 phải đứng trước P3
-        resp_q = self.client.get("/api/relief/queue")
+        # 3. Lấy hàng chờ (xác thực Điều phối viên RBAC): P1 phải đứng trước P3
+        login_res = self.client.post("/api/auth/login", json={
+            "username": "coordinator_demo",
+            "password": os.getenv("NORTHSTAR_DEMO_PASSWORD", "NorthStarDemo@2026"),
+        })
+        self.assertEqual(login_res.status_code, 200)
+        coord_headers = {"Authorization": f"Bearer {login_res.json()['access_token']}"}
+
+        resp_q = self.client.get("/api/relief/queue", headers=coord_headers)
         self.assertEqual(resp_q.status_code, 200)
         items = resp_q.json()["items"]
         self.assertTrue(len(items) >= 2)
@@ -351,19 +359,19 @@ class TestReliefTriageAISystem(unittest.TestCase):
             "new_priority": "P2",
             "dispatcher_name": "Thiếu tá Nguyễn Văn Bình",
             "reason": "Thực địa ghi nhận khu vực chuẩn bị xả lũ, cần ưu tiên tiếp tế sớm."
-        })
+        }, headers=coord_headers)
         self.assertEqual(override_resp.status_code, 200)
         updated_data = override_resp.json()["data"]
         self.assertEqual(updated_data["final_priority"], "P2")
 
         # 5. Kiểm tra audit trail
-        detail_resp = self.client.get(f"/api/relief/queue/{req2_id}")
+        detail_resp = self.client.get(f"/api/relief/queue/{req2_id}", headers=coord_headers)
         self.assertEqual(detail_resp.status_code, 200)
         history = detail_resp.json().get("override_history", [])
         self.assertTrue(any(h.get("actor") == "Thiếu tá Nguyễn Văn Bình" for h in history))
 
         # 6. Kiểm tra API stats
-        stats_resp = self.client.get("/api/relief/stats")
+        stats_resp = self.client.get("/api/relief/stats", headers=coord_headers)
         self.assertEqual(stats_resp.status_code, 200)
         st = stats_resp.json()
         self.assertIn("by_priority", st)

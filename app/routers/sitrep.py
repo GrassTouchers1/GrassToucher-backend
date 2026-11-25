@@ -22,19 +22,22 @@ Quyết định số 18/2021/QĐ-TTg của Thủ tướng Chính phủ về dự
 
 from datetime import datetime, timezone
 from typing import Any
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, Depends, Query, Response
 
+from ..auth import AuthUser, record_audit_event, require_roles
 from .flood_points import DEFAULT_FLOOD_POINTS
 from .disasters import list_disasters
 from .shelters import list_shelters
-from .sos import list_sos_beacons
+from .sos import _fetch_sos_collection
 
 router = APIRouter(prefix="/api/reports", tags=["Báo cáo Tác chiến SitRep"])
 
 @router.get("/sitrep", summary="Lấy báo cáo tác chiến tình hình thiên tai chuẩn Ban Chỉ huy PCTT")
 def get_situation_report(
-    format: str = Query("json", description="Định dạng: json hoặc html")
+    format: str = Query("json", description="Định dạng: json hoặc html"),
+    user: AuthUser = Depends(require_roles("rescue", "coordinator", "admin")),
 ) -> Any:
+    record_audit_event("sitrep_export", "sitrep", format, "success", None, actor=user)
     now_utc = datetime.now(timezone.utc)
     now_vn_str = now_utc.strftime("%H giờ %M phút, ngày %d tháng %m năm %Y")
 
@@ -45,7 +48,7 @@ def get_situation_report(
     safe_pts = [p for p in DEFAULT_FLOOD_POINTS if (p.get("depth_cm") or 0.0) < 5.0]
 
     # Thống kê SOS cứu hộ
-    sos_data = list_sos_beacons()
+    sos_data = _fetch_sos_collection()
     sos_features = sos_data.get("features", [])
     total_sos = len(sos_features)
     people_stranded = sum(int(f["properties"].get("people_count") or 1) for f in sos_features)

@@ -140,6 +140,9 @@ def get_simulation_timeline(
         points = calculate_step_depths(matched_step["hour"], matched_step["rainfall_mm"])
         return {
             "scenario": scenario,
+            "simulated": True,
+            "data_type": "simulation_demo",
+            "warning": "DỮ LIỆU MÔ PHỎNG KỊCH BẢN (SIMULATED / DEMO) — Không phải số đo cảm biến thời gian thực.",
             "current_step": matched_step,
             "total_points": len(points),
             "safe_count": sum(1 for p in points if p["status"] == "safe"),
@@ -151,7 +154,10 @@ def get_simulation_timeline(
     # Trả về tổng quan toàn bộ timeline
     return {
         "scenario": scenario,
+        "simulated": True,
+        "data_type": "simulation_demo",
+        "warning": "DỮ LIỆU MÔ PHỎNG KỊCH BẢN (SIMULATED / DEMO) — Không phải số đo cảm biến thời gian thực.",
         "title": "Mô phỏng Hoàn lưu Bão số 3 (Yagi) & Lũ lụt Lịch sử Miền Bắc",
-        "description": "Kịch bản tổng hợp mô phỏng diễn biến lượng mưa từ 2mm đến 170mm và phản ứng thủy văn trên 155 trạm đo.",
+        "description": "Kịch bản tổng hợp mô phỏng diễn biến lượng mưa từ 2mm đến 170mm và phản ứng thủy văn trên hệ thống trạm đo.",
         "steps": TIMELINE_STEPS
     }

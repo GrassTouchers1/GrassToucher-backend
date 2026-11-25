@@ -42,7 +42,9 @@ from .routers import (
     ai_endpoints,
     sitrep,
     relief_triage,
+    auth as auth_routers,
 )
+from .auth import init_auth_tables
 
 app = FastAPI(
     title="NorthStar / FloodNav API",
@@ -81,6 +83,10 @@ app.include_router(rescue_dispatch.router)
 app.include_router(ai_endpoints.router)
 app.include_router(sitrep.router)
 app.include_router(relief_triage.router)
+app.include_router(auth_routers.auth_router)
+app.include_router(auth_routers.admin_router)
+
+init_auth_tables()
 
 
 @app.get("/", include_in_schema=False)

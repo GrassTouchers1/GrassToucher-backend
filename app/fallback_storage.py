@@ -21,14 +21,22 @@ Sử dụng SQLite với cơ chế khoá file và WAL để đảm bảo:
 - Dữ liệu số đo (readings) và báo cáo (reports) được lưu bền vững vào đĩa thay vì chỉ lưu tạm trên RAM
 - Tách biệt hoàn toàn số đo quan trắc khỏi danh mục trạm ngập mặc định (DEFAULT_FLOOD_POINTS)
 """
-import sqlite3
+import json
 import logging
-from pathlib import Path
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional
+import sqlite3
 import tempfile
+import threading
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+from typing import Dict, List, Optional
 
 log = logging.getLogger("floodnav.fallback_storage")
+_FALLBACK_WRITE_LOCK = threading.Lock()
+
+
+class IdempotencyConflictError(Exception):
+    """Ngoại lệ khi cùng client_event_id nhưng nội dung payload xung đột."""
+    pass
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -124,14 +132,21 @@ def init_fallback_db():
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     contact_name TEXT NOT NULL,
                     phone TEXT NOT NULL,
-                    lng REAL NOT NULL,
-                    lat REAL NOT NULL,
+                    lng REAL,
+                    lat REAL,
+                    location_source TEXT DEFAULT 'manual',
+                    location_accuracy_m REAL,
+                    location_captured_at TEXT,
+                    location_confirmed INTEGER DEFAULT 0,
+                    location_description TEXT,
+                    location_landmark TEXT,
                     people_count INTEGER DEFAULT 1,
                     has_elderly_or_children INTEGER DEFAULT 0,
                     water_level_cm REAL DEFAULT 0.0,
                     priority TEXT DEFAULT 'high',
                     status TEXT DEFAULT 'pending',
                     notes TEXT,
+                    owner_user_id INTEGER,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
@@ -178,6 +193,122 @@ def init_fallback_db():
                 CREATE INDEX IF NOT EXISTS idx_fb_relief_audit_req ON fallback_relief_audit(request_id);
             """)
 
+            # Di tru an toan bang fallback_sos / fallback_reports / fallback_relief_requests
+            table_info = conn.execute("PRAGMA table_info(fallback_sos)").fetchall()
+            existing_sos_cols = {row[1] for row in table_info}
+            lng_notnull = any(row[1] == "lng" and row[3] == 1 for row in table_info)
+            sos_migrations = [
+                ("location_source", "TEXT DEFAULT 'manual'"),
+                ("location_accuracy_m", "REAL"),
+                ("location_captured_at", "TEXT"),
+                ("location_confirmed", "INTEGER DEFAULT 0"),
+                ("location_description", "TEXT"),
+                ("location_landmark", "TEXT"),
+                ("owner_user_id", "INTEGER"),
+                ("client_event_id", "TEXT"),
+                ("payload_hash", "TEXT"),
+                ("tracking_token_hash", "TEXT"),
+                ("tracking_token_expires_at", "TEXT"),
+                ("tracking_token_revoked", "INTEGER DEFAULT 0"),
+                ("ingest_channel", "TEXT DEFAULT 'direct_online'"),
+                ("hop_count", "INTEGER DEFAULT 0"),
+                ("signature_verified", "INTEGER DEFAULT 0"),
+                ("origin_created_at", "TEXT"),
+                ("relayed_at", "TEXT"),
+                ("relay_hops_json", "TEXT"),
+            ]
+            for col_name, col_def in sos_migrations:
+                if col_name not in existing_sos_cols:
+                    conn.execute(f"ALTER TABLE fallback_sos ADD COLUMN {col_name} {col_def}")
+
+            if lng_notnull:
+                conn.executescript("""
+                    CREATE TABLE IF NOT EXISTS fallback_sos_v2 (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        contact_name TEXT NOT NULL,
+                        phone TEXT NOT NULL,
+                        lng REAL,
+                        lat REAL,
+                        location_source TEXT DEFAULT 'manual',
+                        location_accuracy_m REAL,
+                        location_captured_at TEXT,
+                        location_confirmed INTEGER DEFAULT 0,
+                        location_description TEXT,
+                        location_landmark TEXT,
+                        people_count INTEGER DEFAULT 1,
+                        has_elderly_or_children INTEGER DEFAULT 0,
+                        water_level_cm REAL DEFAULT 0.0,
+                        priority TEXT DEFAULT 'high',
+                        status TEXT DEFAULT 'pending',
+                        notes TEXT,
+                        owner_user_id INTEGER,
+                        client_event_id TEXT,
+                        payload_hash TEXT,
+                        tracking_token_hash TEXT,
+                        tracking_token_expires_at TEXT,
+                        tracking_token_revoked INTEGER DEFAULT 0,
+                        ingest_channel TEXT DEFAULT 'direct_online',
+                        hop_count INTEGER DEFAULT 0,
+                        signature_verified INTEGER DEFAULT 0,
+                        origin_created_at TEXT,
+                        relayed_at TEXT,
+                        relay_hops_json TEXT,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    );
+                    INSERT INTO fallback_sos_v2 (
+                        id, contact_name, phone, lng, lat,
+                        location_source, location_accuracy_m, location_captured_at,
+                        location_confirmed, location_description, location_landmark,
+                        people_count, has_elderly_or_children, water_level_cm,
+                        priority, status, notes, owner_user_id,
+                        client_event_id, payload_hash,
+                        tracking_token_hash, tracking_token_expires_at, tracking_token_revoked,
+                        ingest_channel, hop_count, signature_verified,
+                        origin_created_at, relayed_at, relay_hops_json,
+                        created_at, updated_at
+                    )
+                    SELECT id, contact_name, phone, lng, lat,
+                           location_source, location_accuracy_m, location_captured_at,
+                           location_confirmed, location_description, location_landmark,
+                           people_count, has_elderly_or_children, water_level_cm,
+                           priority, status, notes, owner_user_id,
+                           client_event_id, payload_hash,
+                           tracking_token_hash, tracking_token_expires_at, tracking_token_revoked,
+                           ingest_channel, hop_count, signature_verified,
+                           origin_created_at, relayed_at, relay_hops_json,
+                           created_at, updated_at
+                    FROM fallback_sos;
+                    DROP TABLE fallback_sos;
+                    ALTER TABLE fallback_sos_v2 RENAME TO fallback_sos;
+                """)
+
+            conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_fb_sos_client_event_id
+                ON fallback_sos(client_event_id) WHERE client_event_id IS NOT NULL
+            """)
+            conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_fb_sos_tracking_token_hash
+                ON fallback_sos(tracking_token_hash) WHERE tracking_token_hash IS NOT NULL
+            """)
+
+            existing_rep_cols = {
+                row[1] for row in conn.execute("PRAGMA table_info(fallback_reports)").fetchall()
+            }
+            for col_name, col_def in [("client_event_id", "TEXT"), ("payload_hash", "TEXT")]:
+                if col_name not in existing_rep_cols:
+                    conn.execute(f"ALTER TABLE fallback_reports ADD COLUMN {col_name} {col_def}")
+            conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_fb_reports_client_event_id
+                ON fallback_reports(client_event_id) WHERE client_event_id IS NOT NULL
+            """)
+
+            existing_rel_cols = {
+                row[1] for row in conn.execute("PRAGMA table_info(fallback_relief_requests)").fetchall()
+            }
+            if "owner_user_id" not in existing_rel_cols:
+                conn.execute("ALTER TABLE fallback_relief_requests ADD COLUMN owner_user_id INTEGER")
+
             # Seed default disasters if empty
             count = conn.execute("SELECT COUNT(*) FROM fallback_disasters").fetchone()[0]
             if count == 0:
@@ -199,6 +330,44 @@ def init_fallback_db():
                     ("Lũ báo động 3 sông Bùi - Ngập úng sâu xã Nam Phương Tiến (Chương Mỹ)", "flood", "high", "active", "Nước lũ dâng ngập trắng các thôn Nhân Lý, Nam Hài, sâu từ 1m đến 2m, kéo dài nhiều ngày.", 105.6580, 20.8920, 1500.0, now_iso, now_iso),
                     ("Điểm ngập úng đô thị Cầu Giấy - Hoa Bằng", "flood", "medium", "active", "Mực nước ngập 35cm sau cơn mưa lớn kéo dài, các phương tiện xe máy di chuyển khó khăn.", 105.7950, 21.0220, 300.0, now_iso, now_iso)
                 ])
+
+            # Bo sung thien tai dac trung cac tinh Phia Bac
+            existing_disaster_titles = {
+                row[0].strip().lower()
+                for row in conn.execute("SELECT title FROM fallback_disasters").fetchall()
+                if row and row[0]
+            }
+            now_iso = datetime.now(timezone.utc).isoformat()
+            north_disasters = [
+                ("Sạt lở đất đá taluy dương đèo Ô Quy Hồ - QL4D (Sa Pa, Lào Cai)", "landslide", "critical", "active", "Đất đá từ vách núi sạt trượt xuống mặt đường QL4D, gây ách tắc và nguy hiểm cho phương tiện qua đèo.", 103.7750, 22.3520, 1800.0, now_iso, now_iso),
+                ("Lũ quét & sạt lở bờ suối khu vực Bát Xát (Lào Cai)", "landslide", "high", "active", "Mưa lớn kéo dài gây lũ ống từ thượng nguồn suối, sạt lở đường liên xã vùng cao Bát Xát.", 103.6550, 22.5850, 2000.0, now_iso, now_iso),
+                ("Sạt lở đồi đất tại đèo Khau Phạ - Mù Cang Chải (Yên Bái)", "landslide", "critical", "active", "Nguy cơ sạt trượt đất đá cao dọc QL32 qua Mù Cang Chải, nhiều đoạn mặt đường bị nứt lún.", 104.2480, 21.7580, 2200.0, now_iso, now_iso),
+                ("Sạt lở đất đá QL4C khu vực Cổng Trời Quản Bạ - Bắc Mê (Hà Giang)", "landslide", "critical", "active", "Đất đá sạt lở nhiều điểm trên tuyến QL4C, đe dọa chia cắt giao thông lên vùng cao nguyên đá.", 105.0020, 23.0480, 1800.0, now_iso, now_iso),
+                ("Lũ dâng cao sông Lô & ngập vùng trũng TP Hà Giang", "flood", "high", "active", "Nước sông Lô dâng nhanh gây ngập các khu dân cư ven sông và tuyến đường trục chính TP Hà Giang.", 104.9830, 22.8230, 2000.0, now_iso, now_iso),
+                ("Sạt lở đất đá tuyến QL279 & ngập suối Nậm La (TP Sơn La)", "landslide", "high", "active", "Mưa lớn gây ngập cục bộ vùng trũng lưu vực suối Nậm La và sạt lở taluy dọc các tuyến đèo.", 103.9180, 21.3260, 2000.0, now_iso, now_iso),
+                ("Sạt lở taluy đường đèo Pha Đin - Tuần Giáo (Điện Biên)", "landslide", "critical", "active", "Đất đá sạt trượt vùi lấp một phần mặt đường QL6 qua đèo Pha Đin, tiềm ẩn nguy cơ sạt tiếp.", 103.5240, 21.5760, 1800.0, now_iso, now_iso),
+                ("Lũ quét & sạt lở đất đá đèo Hoàng Liên - Phong Thổ (Lai Châu)", "landslide", "high", "active", "Mưa rừng lớn làm sạt lở ta-luy dương và ngập tràn ngầm suối khu vực Phong Thổ.", 103.3200, 22.5350, 1800.0, now_iso, now_iso),
+                ("Sạt lở taluy & ách tắc QL3 đèo Giàng (Bắc Kạn)", "landslide", "high", "active", "Sạt trượt khối đất đá lớn xuống lòng đường QL3, chia cắt tuyến nối TP Bắc Kạn - Cao Bằng.", 105.8750, 22.2950, 1600.0, now_iso, now_iso),
+                ("Lũ sông Kỳ Cùng & sạt lở đất khu vực Chi Lăng - Hữu Lũng (Lạng Sơn)", "flood", "high", "active", "Nước lũ sông Kỳ Cùng lên nhanh gây ngập vùng trũng và sạt trượt bờ taluy dọc QL1A.", 106.5850, 21.6620, 2000.0, now_iso, now_iso),
+                ("Sạt lở đất đá đèo Thung Khe - Mai Châu QL6 (Hòa Bình)", "landslide", "critical", "active", "Đá lăn và sạt trượt taluy dương nguy hiểm trên QL6 đoạn dốc Cun - đèo Thung Khe.", 105.1720, 20.6910, 1600.0, now_iso, now_iso),
+                ("Sạt lở đất đá đường lên VQG Tam Đảo (Vĩnh Phúc)", "landslide", "high", "active", "Mưa lớn làm bão hòa đất đồi gây sạt trượt nhiều đoạn đường đèo lên thị trấn Tam Đảo.", 105.6430, 21.4540, 1400.0, now_iso, now_iso),
+                ("Gió bão giật mạnh & ngập úng ven biển Móng Cái (Quảng Ninh)", "storm", "high", "active", "Hoàn lưu bão gây gió giật cấp 11-12, triều dâng ngập vùng ven biển và cửa sông Ka Long.", 107.9660, 21.5280, 2500.0, now_iso, now_iso),
+                ("Sạt lở taluy khu dân cư đồi cao tại Hạ Long - Cẩm Phả (Quảng Ninh)", "landslide", "high", "active", "Mưa sau bão làm sạt trượt đất đá khu vực sườn đồi ven đô Cẩm Phả và Hạ Long.", 107.2650, 21.0120, 1800.0, now_iso, now_iso),
+                ("Gió giật mạnh & ngập úng đô thị khu vực Lạch Tray - Đồ Sơn (Hải Phòng)", "storm", "high", "active", "Bão và hoàn lưu gây cây đổ, ngập sâu các trục đường trũng và ven biển Đồ Sơn.", 106.7850, 20.7200, 2400.0, now_iso, now_iso),
+                ("Ngập lụt lưu vực sông Thái Bình tại Phả Lại - Chí Linh (Hải Dương)", "flood", "high", "active", "Mực nước sông Thái Bình vượt báo động 2, ngập úng các khu vực ngoài đê và vùng trũng Chí Linh.", 106.3060, 21.1110, 2000.0, now_iso, now_iso),
+                ("Cảnh báo tràn đê bối ven sông Hồng (TP Hưng Yên - Khoái Châu)", "flood", "medium", "active", "Lũ thượng nguồn đổ về làm nước sông Hồng dâng cao sát mặt đê bối các xã ven sông.", 106.0150, 20.7850, 1800.0, now_iso, now_iso),
+                ("Triều cường & sóng lớn uy hiếp kè biển Hải Hậu - Giao Thủy (Nam Định)", "storm", "high", "active", "Sóng biển cao kết hợp triều cường dâng mạnh tại tuyến đê biển Thịnh Long - Hải Hậu.", 106.2860, 20.0460, 2500.0, now_iso, now_iso),
+                ("Sóng lớn & gió mạnh vùng cửa sông Trà Lý - Tiền Hải (Thái Bình)", "storm", "high", "active", "Gió mạnh cấp 10-11 kèm mưa lớn gây ngập úng đồng ruộng và khu dân cư ven đê Tiền Hải.", 106.5520, 20.4120, 2200.0, now_iso, now_iso),
+                ("Lũ lớn sông Hoàng Long tràn qua đê Nho Quan - Gia Viễn (Ninh Bình)", "flood", "high", "active", "Mực nước sông Hoàng Long dâng vượt báo động 3 gây ngập sâu nhiều xã vùng phân lũ.", 105.8450, 20.3350, 2200.0, now_iso, now_iso),
+                ("Ngập lụt vùng trũng lưu vực sông Đáy (Phủ Lý - Thanh Liêm, Hà Nam)", "flood", "high", "active", "Mực nước sông Đáy lên cao gây ngập úng các khu dân cư ven sông và tuyến QL1A trũng thấp.", 105.9130, 20.5410, 1800.0, now_iso, now_iso),
+                ("Ngập lụt & sạt lở bờ sông Cầu khu vực Yên Phong - TP Bắc Ninh", "flood", "high", "active", "Nước sông Cầu dâng cao gây sạt lở một số đoạn bờ kè và ngập vùng bãi ngoài đê.", 106.0150, 21.2150, 1800.0, now_iso, now_iso),
+            ]
+            extra_disasters = [d for d in north_disasters if d[0].strip().lower() not in existing_disaster_titles]
+            if extra_disasters:
+                conn.executemany("""
+                    INSERT INTO fallback_disasters (title, hazard_type, severity, status, description, lng, lat, radius_m, start_time, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, extra_disasters)
 
             # Seed default shelters if empty
             s_count = conn.execute("SELECT COUNT(*) FROM fallback_shelters").fetchone()[0]
@@ -224,6 +393,42 @@ def init_fallback_db():
                     ("Trường THPT Yên Hòa (Điểm sơ tán Cầu Giấy)", "Ngõ 251 Nguyễn Khang, Yên Hòa, Cầu Giấy, Hà Nội", 105.7940, 21.0210, 600, 85, "024-3833-1122", "Đầy đủ nước sạch, lương thực và chăn ấm", "open", now_iso),
                     ("Trường Tiểu học Nam Phương Tiến A (Điểm tránh lũ Chương Mỹ)", "Xã Nam Phương Tiến, Chương Mỹ, Hà Nội", 105.6620, 20.8960, 500, 210, "024-3386-7788", "Đã tiếp nhận lương khô, áo phao và thuốc men", "open", now_iso)
                 ])
+
+            northern_json = Path(__file__).resolve().parent.parent / "data" / "northern_shelters.json"
+            if northern_json.exists():
+                try:
+                    ndata = json.loads(northern_json.read_text(encoding="utf-8"))
+                    existing_names = {
+                        row[0].strip().lower()
+                        for row in conn.execute("SELECT name FROM fallback_shelters").fetchall()
+                        if row and row[0]
+                    }
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    extra_rows = []
+                    for s in ndata.get("shelters", []):
+                        sname = (s.get("name") or "").strip()
+                        if not sname or sname.lower() in existing_names:
+                            continue
+                        existing_names.add(sname.lower())
+                        extra_rows.append((
+                            sname,
+                            s.get("address") or "Khu vực Phía Bắc Việt Nam",
+                            float(s["lng"]),
+                            float(s["lat"]),
+                            int(s.get("capacity") or 600),
+                            int(s.get("current_occupancy") or 0),
+                            s.get("contact_phone"),
+                            s.get("supplies_status") or "Cơ sở công cộng kiên cố (Wikidata CC0-1.0)",
+                            s.get("status") or "open",
+                            now_iso,
+                        ))
+                    if extra_rows:
+                        conn.executemany("""
+                            INSERT INTO fallback_shelters (name, address, lng, lat, capacity, current_occupancy, contact_phone, supplies_status, status, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, extra_rows)
+                except Exception as exc:
+                    log.warning("Không thể nạp northern_shelters.json: %s", exc)
 
             # Seed default SOS requests if empty
             sos_count = conn.execute("SELECT COUNT(*) FROM fallback_sos").fetchone()[0]
@@ -355,25 +560,69 @@ def save_fallback_report(
     lng: float,
     lat: float,
     level: str,
-    photo_url: Optional[str]
+    photo_url: Optional[str],
+    client_event_id: Optional[str] = None,
+    payload_hash: Optional[str] = None,
 ) -> dict:
-    """Lưu báo cáo ngập từ người dân vào bộ nhớ bền vững."""
+    """Lưu báo cáo ngập từ người dân vào bộ nhớ bền vững (hỗ trợ idempotency qua client_event_id)."""
     now = datetime.now(timezone.utc)
     exp = now + timedelta(minutes=45)
     now_iso = now.isoformat()
     exp_iso = exp.isoformat()
-    try:
-        with _get_connection() as conn:
-            cursor = conn.execute(
-                """INSERT INTO fallback_reports (user_id, lng, lat, level, photo_url, confirmed, created_at, expires_at)
-                   VALUES (?, ?, ?, ?, ?, 1, ?, ?)""",
-                (user_id, lng, lat, level, photo_url, now_iso, exp_iso)
-            )
-            rep_id = cursor.lastrowid
-            conn.commit()
-    except Exception as e:
-        log.warning("Lỗi ghi fallback_reports: %s", e)
-        rep_id = int(datetime.now().timestamp() * 1000)
+    with _FALLBACK_WRITE_LOCK:
+        try:
+            init_fallback_db()
+            with _get_connection() as conn:
+                if client_event_id:
+                    existing = conn.execute(
+                        "SELECT id, level, confirmed, expires_at, payload_hash FROM fallback_reports WHERE client_event_id = ?",
+                        (client_event_id,)
+                    ).fetchone()
+                    if existing:
+                        if existing["payload_hash"] and payload_hash and existing["payload_hash"] != payload_hash:
+                            raise IdempotencyConflictError("Xung đột payload cho client_event_id báo cáo ngập.")
+                        return {
+                            "id": existing["id"],
+                            "level": existing["level"],
+                            "confirmed": bool(existing["confirmed"]),
+                            "nearby_reports": 1,
+                            "need_more": 0,
+                            "expires_at": existing["expires_at"],
+                            "client_event_id": client_event_id,
+                            "idempotent_replay": True,
+                        }
+                cursor = conn.execute(
+                    """INSERT INTO fallback_reports (user_id, lng, lat, level, photo_url, confirmed, created_at, expires_at, client_event_id, payload_hash)
+                       VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)""",
+                    (user_id, lng, lat, level, photo_url, now_iso, exp_iso, client_event_id, payload_hash)
+                )
+                rep_id = cursor.lastrowid
+                conn.commit()
+        except IdempotencyConflictError:
+            raise
+        except sqlite3.IntegrityError:
+            with _get_connection() as conn:
+                existing = conn.execute(
+                    "SELECT id, level, confirmed, expires_at, payload_hash FROM fallback_reports WHERE client_event_id = ?",
+                    (client_event_id,)
+                ).fetchone()
+                if existing:
+                    if existing["payload_hash"] and payload_hash and existing["payload_hash"] != payload_hash:
+                        raise IdempotencyConflictError("Xung đột payload cho client_event_id báo cáo ngập.")
+                    return {
+                        "id": existing["id"],
+                        "level": existing["level"],
+                        "confirmed": bool(existing["confirmed"]),
+                        "nearby_reports": 1,
+                        "need_more": 0,
+                        "expires_at": existing["expires_at"],
+                        "client_event_id": client_event_id,
+                        "idempotent_replay": True,
+                    }
+            rep_id = int(datetime.now().timestamp() * 1000)
+        except Exception as e:
+            log.warning("Lỗi ghi fallback_reports: %s", e)
+            rep_id = int(datetime.now().timestamp() * 1000)
 
     return {
         "id": rep_id,
@@ -382,6 +631,8 @@ def save_fallback_report(
         "nearby_reports": 1,
         "need_more": 0,
         "expires_at": exp_iso,
+        "client_event_id": client_event_id,
+        "idempotent_replay": False,
     }
 
 
@@ -537,20 +788,39 @@ def save_fallback_shelter(data: dict) -> dict:
 # COMMUNITY SOS FALLBACK STORAGE
 # ==========================================
 
-def get_fallback_sos(status: Optional[str] = None) -> List[dict]:
+def get_fallback_sos(status: Optional[str] = None, owner_user_id: Optional[int] = None) -> List[dict]:
     try:
         with _get_connection() as conn:
-            sql = "SELECT id, contact_name, phone, lng, lat, people_count, has_elderly_or_children, water_level_cm, priority, status, notes, created_at, updated_at FROM fallback_sos"
+            sql = """
+                SELECT id, contact_name, phone, lng, lat,
+                       location_source, location_accuracy_m, location_captured_at,
+                       location_confirmed, location_description, location_landmark,
+                       people_count, has_elderly_or_children, water_level_cm,
+                       priority, status, notes, owner_user_id, created_at, updated_at,
+                       client_event_id, ingest_channel, hop_count, signature_verified,
+                       origin_created_at, relayed_at, relay_hops_json
+                FROM fallback_sos
+            """
+            clauses = []
             params = []
             if status:
-                sql += " WHERE status = ?"
+                clauses.append("status = ?")
                 params.append(status)
+            if owner_user_id is not None:
+                clauses.append("owner_user_id = ?")
+                params.append(int(owner_user_id))
+            if clauses:
+                sql += " WHERE " + " AND ".join(clauses)
             sql += " ORDER BY id DESC"
             rows = conn.execute(sql, params).fetchall()
             return [
                 {
                     **dict(r),
-                    "has_elderly_or_children": bool(r["has_elderly_or_children"])
+                    "has_elderly_or_children": bool(r["has_elderly_or_children"]),
+                    "location_confirmed": bool(r["location_confirmed"]),
+                    "signature_verified": bool(r["signature_verified"]),
+                    "ingest_channel": r["ingest_channel"] or "direct_online",
+                    "hop_count": int(r["hop_count"] or 0),
                 }
                 for r in rows
             ]
@@ -559,32 +829,171 @@ def get_fallback_sos(status: Optional[str] = None) -> List[dict]:
         return []
 
 
-def save_fallback_sos(data: dict) -> dict:
-    now_iso = datetime.now(timezone.utc).isoformat()
+def get_fallback_sos_by_id(sos_id: int) -> Optional[dict]:
     try:
         with _get_connection() as conn:
-            cursor = conn.execute("""
-                INSERT INTO fallback_sos (contact_name, phone, lng, lat, people_count, has_elderly_or_children, water_level_cm, priority, status, notes, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                data["contact_name"], data["phone"], float(data["lng"]), float(data["lat"]),
-                int(data.get("people_count", 1)), 1 if data.get("has_elderly_or_children") else 0,
-                float(data.get("water_level_cm", 0.0)), data.get("priority", "high"),
-                data.get("status", "pending"), data.get("notes"), now_iso, now_iso
-            ))
-            conn.commit()
-            res = dict(data)
-            res["id"] = cursor.lastrowid
-            res["status"] = data.get("status", "pending")
-            res["created_at"] = now_iso
-            res["updated_at"] = now_iso
-            return res
+            r = conn.execute("SELECT * FROM fallback_sos WHERE id = ?", (sos_id,)).fetchone()
+            if not r:
+                return None
+            d = dict(r)
+            d["has_elderly_or_children"] = bool(d["has_elderly_or_children"])
+            d["location_confirmed"] = bool(d.get("location_confirmed"))
+            d["signature_verified"] = bool(d.get("signature_verified"))
+            return d
     except Exception as e:
-        log.warning("Lỗi save_fallback_sos: %s", e)
-        res = dict(data)
-        res["id"] = int(datetime.now().timestamp() * 1000)
-        res["status"] = data.get("status", "pending")
-        return res
+        log.warning("Lỗi get_fallback_sos_by_id: %s", e)
+        return None
+
+
+def save_fallback_sos(data: dict) -> dict:
+    now_iso = datetime.now(timezone.utc).isoformat()
+    lng_val = float(data["lng"]) if data.get("lng") is not None else None
+    lat_val = float(data["lat"]) if data.get("lat") is not None else None
+    acc_val = float(data["location_accuracy_m"]) if data.get("location_accuracy_m") is not None else None
+    client_event_id = data.get("client_event_id")
+    payload_hash = data.get("payload_hash")
+    owner_user_id = int(data["owner_user_id"]) if data.get("owner_user_id") is not None else None
+
+    with _FALLBACK_WRITE_LOCK:
+        try:
+            init_fallback_db()
+            with _get_connection() as conn:
+                if client_event_id:
+                    existing = conn.execute(
+                        "SELECT * FROM fallback_sos WHERE client_event_id = ?",
+                        (client_event_id,)
+                    ).fetchone()
+                    if existing:
+                        if existing["payload_hash"] and payload_hash and existing["payload_hash"] != payload_hash:
+                            raise IdempotencyConflictError("Xung đột payload cho client_event_id SOS.")
+                        d = dict(existing)
+                        new_hops = data.get("relay_hops")
+                        if isinstance(new_hops, list) and new_hops:
+                            try:
+                                cur_hops = json.loads(d.get("relay_hops_json") or "[]")
+                            except Exception:
+                                cur_hops = []
+                            merged = cur_hops + [h for h in new_hops if h not in cur_hops]
+                            conn.execute(
+                                "UPDATE fallback_sos SET relay_hops_json = ?, updated_at = ? WHERE id = ?",
+                                (json.dumps(merged, ensure_ascii=False), now_iso, d["id"]),
+                            )
+                            conn.commit()
+                            d["relay_hops_json"] = json.dumps(merged, ensure_ascii=False)
+                        d["has_elderly_or_children"] = bool(d["has_elderly_or_children"])
+                        d["location_confirmed"] = bool(d["location_confirmed"])
+                        d["signature_verified"] = bool(d.get("signature_verified"))
+                        d["ingest_channel"] = d.get("ingest_channel") or "direct_online"
+                        d["hop_count"] = int(d.get("hop_count") or 0)
+                        d["idempotent_replay"] = True
+                        d["deduplicated"] = True
+                        return d
+
+                relay_hops_str = json.dumps(data.get("relay_hops") or [], ensure_ascii=False) if data.get("relay_hops") is not None else None
+                cursor = conn.execute("""
+                    INSERT INTO fallback_sos (
+                        contact_name, phone, lng, lat,
+                        location_source, location_accuracy_m, location_captured_at,
+                        location_confirmed, location_description, location_landmark,
+                        people_count, has_elderly_or_children, water_level_cm,
+                        priority, status, notes, owner_user_id, created_at, updated_at,
+                        client_event_id, payload_hash,
+                        tracking_token_hash, tracking_token_expires_at, tracking_token_revoked,
+                        ingest_channel, hop_count, signature_verified,
+                        origin_created_at, relayed_at, relay_hops_json
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    data["contact_name"], data["phone"], lng_val, lat_val,
+                    data.get("location_source", "manual"), acc_val, data.get("location_captured_at"),
+                    1 if data.get("location_confirmed") else 0,
+                    data.get("location_description"), data.get("location_landmark"),
+                    int(data.get("people_count", 1)), 1 if data.get("has_elderly_or_children") else 0,
+                    float(data.get("water_level_cm", 0.0)), data.get("priority", "high"),
+                    data.get("status", "pending"), data.get("notes"), owner_user_id, now_iso, now_iso,
+                    client_event_id, payload_hash,
+                    data.get("tracking_token_hash"), data.get("tracking_token_expires_at"),
+                    1 if data.get("tracking_token_revoked") else 0,
+                    data.get("ingest_channel", "direct_online"),
+                    int(data.get("hop_count") or 0),
+                    1 if data.get("signature_verified") else 0,
+                    data.get("origin_created_at"),
+                    data.get("relayed_at"),
+                    relay_hops_str,
+                ))
+                conn.commit()
+                res = dict(data)
+                res["id"] = cursor.lastrowid
+                res["lng"] = lng_val
+                res["lat"] = lat_val
+                res["owner_user_id"] = owner_user_id
+                res["status"] = data.get("status", "pending")
+                res["created_at"] = now_iso
+                res["updated_at"] = now_iso
+                res["ingest_channel"] = data.get("ingest_channel", "direct_online")
+                res["hop_count"] = int(data.get("hop_count") or 0)
+                res["signature_verified"] = bool(data.get("signature_verified"))
+                res["idempotent_replay"] = False
+                res["deduplicated"] = False
+                return res
+        except IdempotencyConflictError:
+            raise
+        except sqlite3.IntegrityError:
+            with _get_connection() as conn:
+                existing = conn.execute(
+                    "SELECT * FROM fallback_sos WHERE client_event_id = ?",
+                    (client_event_id,)
+                ).fetchone()
+                if existing:
+                    if existing["payload_hash"] and payload_hash and existing["payload_hash"] != payload_hash:
+                        raise IdempotencyConflictError("Xung đột payload cho client_event_id SOS.")
+                    d = dict(existing)
+                    d["has_elderly_or_children"] = bool(d["has_elderly_or_children"])
+                    d["location_confirmed"] = bool(d["location_confirmed"])
+                    d["idempotent_replay"] = True
+                    return d
+        except Exception as e:
+            log.warning("Lỗi save_fallback_sos: %s", e)
+            res = dict(data)
+            res["id"] = None
+            res["status"] = data.get("status", "pending")
+            return res
+
+
+def get_fallback_sos_by_token_hash(token_hash: str) -> Optional[dict]:
+    if not token_hash:
+        return None
+    try:
+        init_fallback_db()
+        with _get_connection() as conn:
+            row = conn.execute(
+                """SELECT id, status, created_at, updated_at,
+                          tracking_token_expires_at, tracking_token_revoked
+                   FROM fallback_sos WHERE tracking_token_hash = ?""",
+                (token_hash,),
+            ).fetchone()
+            return dict(row) if row else None
+    except Exception as e:
+        log.warning("Lỗi get_fallback_sos_by_token_hash: %s", e)
+        return None
+
+
+def revoke_fallback_sos_token(token_hash: str) -> bool:
+    if not token_hash:
+        return False
+    try:
+        init_fallback_db()
+        with _FALLBACK_WRITE_LOCK:
+            with _get_connection() as conn:
+                cur = conn.execute(
+                    "UPDATE fallback_sos SET tracking_token_revoked = 1 WHERE tracking_token_hash = ?",
+                    (token_hash,),
+                )
+                conn.commit()
+                return cur.rowcount > 0
+    except Exception as e:
+        log.warning("Lỗi revoke_fallback_sos_token: %s", e)
+        return False
 
 
 def update_fallback_sos_status(sos_id: int, new_status: str) -> Optional[dict]:
@@ -592,6 +1001,23 @@ def update_fallback_sos_status(sos_id: int, new_status: str) -> Optional[dict]:
     try:
         with _get_connection() as conn:
             conn.execute("UPDATE fallback_sos SET status = ?, updated_at = ? WHERE id = ?", (new_status, now_iso, sos_id))
+            relief_status = "rescued" if new_status == "rescued" else (
+                "on_scene" if new_status == "on_scene" else (
+                    "dispatched" if new_status == "dispatched" else (
+                        "awaiting_dispatch" if new_status in ("verified", "acknowledged", "pending") else new_status
+                    )
+                )
+            )
+            req_id = f"SOS-{sos_id}"
+            conn.execute(
+                "UPDATE fallback_relief_requests SET status = ?, updated_at = ? WHERE id = ?",
+                (relief_status, now_iso, req_id)
+            )
+            if new_status == "verified":
+                conn.execute(
+                    "UPDATE fallback_relief_requests SET verification_status = 'content_verified', requires_human_review = 0 WHERE id = ?",
+                    (req_id,)
+                )
             conn.commit()
             row = conn.execute("SELECT * FROM fallback_sos WHERE id = ?", (sos_id,)).fetchone()
             if row:

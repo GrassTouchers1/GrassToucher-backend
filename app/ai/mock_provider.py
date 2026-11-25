@@ -257,6 +257,84 @@ class MockAIProvider(AIProvider):
             is_fallback=True
         )
 
+    def _general_survival_guide(self) -> str:
+        """Cẩm nang sinh tồn tổng quát và quy tắc sống còn trong bão lũ & cô lập."""
+        return (
+            "🧭 **CẨM NANG HÀNH ĐỘNG SINH TỒN TRONG BÃO LŨ & CÔ LẬP:**\n\n"
+            "1. ⏱️ **QUY TẮC SỐNG CÒN 3-3-3:**\n"
+            "- Con người chỉ có thể chịu đựng: **3 phút** thiếu oxy, **3 ngày** thiếu nước uống, và **3 tuần** thiếu thức ăn.\n"
+            "- *Thứ tự ưu tiên sống còn: Vị trí trú ẩn cao ráo, an toàn điện > Nước uống sạch > Giữ ấm cơ thể > Khẩu phần lương thực > Tín hiệu kêu cứu.*\n\n"
+            "2. 🛡️ **4 BƯỚC HÀNH ĐỘNG CẤP BÁCH ĐỂ SỐNG SÓT:**\n"
+            "- ⚡ **Bước 1 - Ngắt điện & Lên cao:** Cắt ngay cầu dao/aptomat tổng khi nước mấp mé vào nhà. Di chuyển người già, trẻ nhỏ lên gác xép, tầng thượng hoặc vị trí cao nhất.\n"
+            "- 💧 **Bước 2 - Đảm bảo nguồn nước:** Hứng nước mưa sạch vào xô chậu dự trữ. Tuyệt đối KHÔNG uống trực tiếp nước lũ vì nguy cơ nhiễm khuẩn E.coli và hóa chất độc hại. Đun sôi hoặc lọc qua vải sạch.\n"
+            "- 🌾 **Bước 3 - Tiết kiệm lương thực:** Kê cao bao/can gạo tránh ẩm mốc. Nấu cháo thật loãng để vừa cấp nước vừa duy trì calo; tránh ăn đồ khô mặn gây khát nước.\n"
+            "- 🆘 **Bước 4 - Phát tín hiệu kêu cứu:** Treo mảnh vải sáng màu (đỏ/vàng) lên vị trí cao. Dùng đèn pin hoặc còi phát tín hiệu SOS (3 ngắn - 3 dài - 3 ngắn). Bấm nút SOS bên dưới để truyền tọa độ GPS về Trung tâm Chỉ huy."
+        )
+
+    def _preparedness_and_gobag_guide(self) -> str:
+        """Hướng dẫn chuẩn bị túi đồ cứu sinh khẩn cấp (Go-Bag) trước và trong bão lũ."""
+        return (
+            "🎒 **DANH MỤC TÚI ĐỒ CỨU SINH KHẨN CẤP (GO-BAG):**\n\n"
+            "Mỗi gia đình nên chuẩn bị sẵn 1 ba lô chống nước đặt cạnh lối thoát hiểm:\n"
+            "1. 📄 **Giấy tờ quan trọng:** Cho vào túi zip bọc kín chống ướt (CCCD, thẻ BHYT, sổ hộ khẩu, giấy khai sinh).\n"
+            "2. 💧 **Nước & Lương thực khẩn cấp:** 2 - 3 chai nước suối 500ml/người, lương khô dinh dưỡng, bánh quy ngọt, sữa hộp tiệt trùng.\n"
+            "3. 💊 **Túi y tế cá nhân:** Bông băng gạc, cồn đỏ sát khuẩn, thuốc hạ sốt (Paracetamol), men tiêu hóa/Oresol bù nước, thuốc đặc trị cho người già/bệnh mạn tính.\n"
+            "4. 🔦 **Dụng cụ sinh tồn:** Đèn pin siêu sáng, pin sạc dự phòng điện thoại (đã nạp đầy), còi cứu hộ, bật lửa/diêm chống ẩm, áo mưa bộ, dao đa năng."
+        )
+
+    def _rescue_signaling_guide(self) -> str:
+        """Hướng dẫn phát tín hiệu cầu cứu hiệu quả ban ngày và ban đêm."""
+        return (
+            "📡 **HƯỚNG DẪN PHÁT TÍN HIỆU CẦU CỨU & RA HIỆU CHO ĐỘI CỨU HỘ:**\n\n"
+            "1. ☀️ **Ban ngày (Tín hiệu thị giác & âm thanh):**\n"
+            "- Buộc tấm vải màu nổi bật (đỏ, cam, vàng) hoặc áo phao lên sào/gậy dài vẫy liên tục từ nóc nhà.\n"
+            "- Thổi còi cứu nạn ngắt quãng từng hồi để âm thanh vang xa qua tiếng mưa gió lũ.\n\n"
+            "2. 🌙 **Ban đêm (Tín hiệu ánh sáng SOS quốc tế):**\n"
+            "- Dùng đèn pin hoặc đèn flash điện thoại nháy theo mã Morse SOS: **3 chớp ngắn - 3 chớp dài - 3 chớp ngắn**.\n"
+            "- Chiếu luồng sáng quét theo hình nan quạt về hướng ca nô hoặc trực thăng cứu hộ.\n\n"
+            "3. 📱 **Tín hiệu số:** Bật định vị GPS trên điện thoại và bấm **'Phát tín hiệu SOS'** trên NorthStar để tọa độ truyền thẳng vào bản đồ tác chiến của Ban Chỉ huy."
+        )
+
+    def _post_flood_health_guide(self) -> str:
+        """Hướng dẫn phòng chống dịch bệnh và vệ sinh nguồn nước sau khi nước lũ rút."""
+        return (
+            "🏥 **PHÒNG CHỐNG DỊCH BỆNH & VỆ SINH SAU LŨ (Bộ Y tế):**\n\n"
+            "1. 🦶 **Phòng ngừa nước ăn chân (Nấm kẽ chân):** Rửa chân bằng nước sạch ngay sau khi lội nước lũ, lau thật khô các kẽ ngón chân; bôi thuốc mỡ kháng nấm (như Ketoconazole, cồn BSI).\n"
+            "2. 🦟 **Phòng sốt xuất huyết & tiêu chảy:** Thu gom rác thải, khơi thông cống rãnh tránh nước đọng sinh lăng quăng/bọ gậy. Thực hiện ăn chín, uống sôi tuyệt đối.\n"
+            "3. 🧪 **Thau rửa & Khử trùng giếng nước:** Sau khi nước rút, tát cạn nước đục, nạo vét bùn đáy giếng, sau đó dùng Cloramin B (10 - 20g bột/m³ nước) để khử trùng trước khi sử dụng lại."
+        )
+
+    def _estimate_food_survival(self, msg: str) -> str:
+        """Ước tính thời gian duy trì sự sống dựa trên lượng gạo/lương thực hiện có."""
+        can_match = re.search(r"(\d+)\s*(can|thùng|bao|kg|kí|ký|gói|bát|bò)?\s*(gạo|lương thực|mì|mỳ)", msg)
+        quantity = 3
+        unit = "can gạo"
+        if can_match:
+            try:
+                quantity = int(can_match.group(1))
+                unit = f"{can_match.group(2) or ''} {can_match.group(3)}".strip()
+            except Exception:
+                quantity = 3
+
+        est_kg = quantity * 4.2 if "can" in msg or "thùng" in msg else (quantity * 10 if "bao" in msg else quantity)
+        if "gói" in msg:
+            est_days_1p = max(1, quantity // 2)
+            est_days_family = max(1, quantity // 6)
+        else:
+            est_days_1p = int(est_kg / 0.25)
+            est_days_family = int(est_kg / 0.9)
+
+        return (
+            f"🌾 **TÍNH TOÁN KHẨU PHẦN SINH TỒN ({quantity} {unit}):**\n"
+            f"- Khối lượng ước tính: **~{int(est_kg) if 'gói' not in msg else quantity} {'kg gạo' if 'gói' not in msg else 'gói mì'}**.\n"
+            f"- Nếu **1 người**: Có thể duy trì cầm cự được khoảng **{est_days_1p} ngày** (nấu cháo loãng chia 2 bữa/ngày).\n"
+            f"- Nếu **gia đình 3 - 4 người**: Có thể duy trì được khoảng **{est_days_family} ngày**.\n\n"
+            f"💡 **HƯỚNG DẪN TIẾT KIỆM & SINH TỒN KHI BỊ CÔ LẬP:**\n"
+            f"1. **Nấu cháo loãng:** Vừa tiết kiệm lương thực, vừa bù nước và chống kiệt sức hiệu quả.\n"
+            f"2. **Bảo quản khô ráo:** Kê cao các can gạo lên gác xép hoặc trần nhà, tuyệt đối không để nước ngập làm hỏng, mốc.\n"
+            f"3. **QUY TẮC SỐNG CÒN:** **Đừng đợi đến khi hết sạch gạo mới kêu cứu!** Hãy phát tín hiệu cứu hộ SOS ngay từ hôm nay để Ban Chỉ huy đưa gia đình vào danh sách tiếp tế sớm."
+        )
+
     async def chat(
         self,
         query: str,
@@ -273,7 +351,70 @@ class MockAIProvider(AIProvider):
         live_pts = context.get("flood_points", []) if context else []
         shelters = context.get("shelters", []) if context else []
 
-        if "điện" in msg or "giật" in msg or "cầu dao" in msg:
+        if any(k in msg for k in ["sos", "cứu", "khẩn cấp", "mắc kẹt", "chìm", "giúp", "kêu cứu", "nguy cấp", "đường dây nóng", "114", "112", "nóc nhà", "gác xép", "tràn vào nhà", "ngang cổ", "ngang ngực"]):
+            reply = (
+                "🆘 **HỖ TRỢ CỨU HỘ & ỨNG PHÓ KHẨN CẤP 24/7:**\n"
+                "1. Tổng đài khẩn cấp quốc gia: **114** (Cảnh sát PCCC & Cứu nạn cứu hộ) hoặc **112** (Cứu nạn sự cố thiên tai).\n"
+                "2. Giữ bình tĩnh, đưa người già, trẻ nhỏ và tài sản thiết yếu lên vị trí cao nhất (gác xép, tầng thượng, nóc nhà).\n"
+                "3. Nhấn ngay nút **'Gửi tín hiệu SOS khẩn cấp'** bên dưới để hệ thống định vị GPS và truyền thông tin trực tiếp về Trung tâm Chỉ huy Tác chiến."
+            )
+            actions.append(SuggestedAction(label="🆘 Gửi tín hiệu SOS khẩn cấp", action="open_sos"))
+
+        elif any(k in msg for k in ["thuốc", "y tế", "sơ cứu", "bị thương", "chảy máu", "rắn", "sốt", "đau bụng", "tiêu chảy", "bệnh"]):
+            reply = (
+                "🏥 **HƯỚNG DẪN Y TẾ & SƠ CỨU TRONG VÙNG NGẬP LỤT:**\n"
+                "1. **Rắn / Côn trùng cắn khi lội nước:** Rửa sạch vết thương bằng nước sạch, bất động chi bị cắn ở vị trí thấp hơn tim, TUYỆT ĐỐI không rạch vết thương hay hút nọc. Gọi 114 / 115 khẩn cấp.\n"
+                "2. **Tiêu chảy / Đau bụng:** Bổ sung ngay dung dịch Oresol (pha đúng tỷ lệ 1 gói với 1 lít nước sạch đun sôi) hoặc nước cháo muối loãng để bù điện giải.\n"
+                "3. **Vết thương hở / Chảy máu:** Băng ép cầm máu bằng gạc sạch, kê cao vết thương. Tránh ngâm vết thương trong nước lũ để ngăn uốn ván và hoại tử."
+            )
+            actions.append(SuggestedAction(label="🆘 Yêu cầu hỗ trợ y tế khẩn cấp", action="open_sos"))
+
+        elif any(k in msg for k in ["trẻ em", "trẻ nhỏ", "sơ sinh", "bà bầu", "mang thai", "người già", "tai biến", "người bệnh", "ốm"]):
+            reply = (
+                "🚨 **HỖ TRỢ ĐỐI TƯỢNG ƯU TIÊN DI TẢN CẤP 1:**\n"
+                "- Hệ thống đã nhận diện gia đình có nhóm đối tượng dễ bị tổn thương (trẻ em, bà bầu, người cao tuổi/người bệnh).\n"
+                "- Nhóm này thuộc diện **Ưu tiên Cấp 1 (Critical Priority)** trong kế hoạch cứu nạn của Ban Chỉ huy PCTT.\n"
+                "- Vui lòng nhấn nút **'Gửi tín hiệu SOS khẩn cấp'** bên dưới để tổ cứu hộ điều động xuồng cứu hộ đến đón sớm nhất."
+            )
+            actions.append(SuggestedAction(label="🆘 Ưu tiên cứu hộ khẩn cấp", action="open_sos"))
+
+        elif any(k in msg for k in ["gạo", "mì tôm", "mỳ tôm", "lương thực", "can gạo", "bao gạo", "gói mì", "thức ăn", "thực phẩm", "nhịn ăn", "đói", "cầm cự"]):
+            reply = self._estimate_food_survival(msg)
+            actions.append(SuggestedAction(label="🆘 Gửi tín hiệu cần tiếp tế lương thực", action="open_sos"))
+
+        elif any(k in msg for k in [
+            "để sống", "làm gì để sống", "cần làm gì để sống", "làm sao để sống",
+            "cách sinh tồn", "kỹ năng sinh tồn", "kỹ năng sống", "bí quyết sinh tồn",
+            "kinh nghiệm sinh tồn", "làm thế nào để sống", "sống sót qua", "sống sót",
+            "sinh tồn", "cô lập", "sống thế nào"
+        ]) or ("sống" in msg and any(w in msg for w in ["làm gì", "cần làm", "làm sao", "thế nào", "cách", "hướng dẫn"])):
+            reply = self._general_survival_guide()
+            actions.append(SuggestedAction(label="🆘 Gửi tín hiệu SOS khẩn cấp", action="open_sos"))
+            actions.append(SuggestedAction(label="🛡️ Xem trạm sơ tán gần nhất", action="switch_tab", tab="evac"))
+
+        elif any(k in msg for k in [
+            "chuẩn bị gì", "cần mang gì", "mang theo gì", "túi cứu sinh", "ba lô cứu sinh",
+            "go bag", "dự trữ gì", "vật dụng cần thiết", "đồ đạc cần mang", "túi khẩn cấp", "sơ tán mang gì"
+        ]):
+            reply = self._preparedness_and_gobag_guide()
+            actions.append(SuggestedAction(label="🛡️ Xem trạm sơ tán an toàn", action="switch_tab", tab="evac"))
+            actions.append(SuggestedAction(label="🧭 Mở Tìm đường Né ngập", action="switch_tab", tab="route"))
+
+        elif any(k in msg for k in [
+            "tín hiệu", "báo hiệu", "kêu cứu ban đêm", "cho cứu hộ thấy", "ra hiệu",
+            "còi cứu hộ", "cầu cứu ban đêm", "đèn pin báo hiệu"
+        ]):
+            reply = self._rescue_signaling_guide()
+            actions.append(SuggestedAction(label="🆘 Phát tín hiệu SOS khẩn cấp", action="open_sos"))
+
+        elif any(k in msg for k in [
+            "nước ăn chân", "dịch bệnh", "ghẻ lở", "ô nhiễm", "khử trùng môi trường",
+            "vệ sinh sau lũ", "dọn bùn", "rác thải", "khử trùng giếng"
+        ]):
+            reply = self._post_flood_health_guide()
+            actions.append(SuggestedAction(label="🏥 Yêu cầu hỗ trợ y tế", action="open_sos"))
+
+        elif "điện" in msg or "giật" in msg or "cầu dao" in msg or "aptomat" in msg:
             reply = (
                 "⚡ **HƯỚNG DẪN AN TOÀN ĐIỆN KHI NGẬP NƯỚC (Bộ Công Thương & PCTT):**\n"
                 "1. Ngắt ngay aptomat tổng khi nước mấp mé tràn vào nhà.\n"
@@ -291,35 +432,83 @@ class MockAIProvider(AIProvider):
             )
             actions.append(SuggestedAction(label="🛡️ Xem trạm sơ tán gần nhất", action="switch_tab", tab="evac"))
 
-        elif any(k in msg for k in ["đường nào", "ngập không", "đi được không", "xe máy", "ô tô", "lộ trình"]):
+        elif any(k in msg for k in ["nước uống", "nước sạch", "lọc nước", "khát", "khử trùng nước", "uống nước", "nước ăn", "nước sinh hoạt", "cloramin", "phèn chua"]):
             reply = (
-                "📍 **TRA CỨU GIAO THÔNG & ĐIỀU TIẾT PHƯƠNG TIỆN:**\n"
-                "- Xe máy: Cấm triệt để khi điểm ngập ≥ 20 cm (tránh nước vào bầu lọc gió, chết máy trôi xe).\n"
-                "- Ô tô con: Cấm triệt để khi điểm ngập ≥ 30 cm (nguy cơ thủy kích vỡ lốc máy).\n\n"
-                "💡 Thuật toán $A^*$ trên NorthStar tự động định tuyến phạt chi phí và né hoàn toàn các điểm ngập nguy hiểm."
+                "💧 **HƯỚNG DẪN XỬ LÝ & LỌC NƯỚC UỐNG SINH TỒN (Bộ Y tế & PCTT):**\n"
+                "1. Tuyệt đối KHÔNG uống trực tiếp nước lũ vì nguy cơ nhiễm khuẩn E.coli và hóa chất độc hại.\n"
+                "2. Thu hứng nước mưa từ mái sạch làm nguồn nước uống ưu tiên hàng đầu.\n"
+                "3. Làm trong nước: Dùng vải sạch nhiều lớp lọc cặn, hoặc dùng phèn chua (1g phèn chua cho 20 lít nước), khuấy đều và chờ lắng cặn 30 phút.\n"
+                "4. Khử khuẩn: Đun sôi liên tục tối thiểu 3 - 5 phút hoặc sử dụng viên Cloramin B được cấp phát (1 viên 0.25g cho 25 lít nước)."
             )
-            actions.append(SuggestedAction(label="🧭 Mở Tìm đường Né ngập", action="switch_tab", tab="route"))
+            actions.append(SuggestedAction(label="🆘 Gửi tín hiệu cần cứu trợ", action="open_sos"))
 
-        elif any(prov in msg for prov in ["thái nguyên", "lào cai", "yên bái", "hà nội", "phú thọ"]):
-            reply = (
-                f"🛰️ **DỮ LIỆU ĐỊA BÀN THỜI GIAN THỰC ({msg.title()}):**\n"
-                f"- Các trạm đo đang được cập nhật liên tục qua cảm biến IoT và ảnh vệ tinh SAR Sentinel-1.\n"
-                f"- Hệ thống có {len(shelters)} điểm sơ tán mở cửa tiếp nhận nhân dân và {len(live_pts)} trạm quan trắc tự động.\n"
-                f"- Vui lòng kích hoạt chế độ **Bản đồ Vệ tinh / Lũ lụt** để quan sát vùng rủi ro."
-            )
+        elif any(k in msg for k in ["đường nào", "ngập không", "đi được không", "xe máy", "ô tô", "lộ trình", "tuyến", "cầu giấy", "láng hạ", "thái hà", "hà đông", "hoài đức", "xuân thủy", "mỹ đình", "phạm hùng", "nguyễn trãi", "đống đa", "ba đình", "hoàn kiếm", "ngập", "nước sâu"]):
+            matched_pts = []
+            keywords = ["cầu giấy", "láng hạ", "thái hà", "hà đông", "hoài đức", "xuân thủy", "mỹ đình", "phạm hùng", "nguyễn trãi", "đống đa", "ba đình", "hoàn kiếm", "tây hồ", "thanh xuân", "từ liêm", "đại lộ thăng long", "quốc oai"]
+            for p in live_pts:
+                pname = p.get("name", "").lower()
+                for kw in keywords:
+                    if kw in msg and kw in pname:
+                        matched_pts.append(p)
+                        break
+
+            if matched_pts:
+                lines = []
+                for p in matched_pts[:4]:
+                    d = p.get("depth_cm", 0.0)
+                    st = "Nguy hiểm (Né hoàn toàn)" if d >= 20 else ("Chú ý lội nhẹ" if d >= 5 else "Thông thoáng")
+                    lines.append(f"- **{p.get('name', 'Trạm ngập')}**: Mực nước ~{d}cm — *{st}*")
+                reply = (
+                    "📍 **TÌNH TRẠNG NGẬP LỤT THEO DỮ LIỆU CẢM BIẾN REAL-TIME:**\n"
+                    + "\n".join(lines)
+                    + "\n\n💡 *Khuyến nghị:* Thuật toán $A^*$ trên NorthStar tự động định tuyến phạt chi phí và né hoàn toàn các điểm ngập nguy hiểm trên."
+                )
+                actions.append(SuggestedAction(label="🧭 Tìm lộ trình né ngập tối ưu", action="switch_tab", tab="route"))
+            else:
+                reply = (
+                    "📍 **TRA CỨU GIAO THÔNG & ĐIỀU TIẾT PHƯƠNG TIỆN:**\n"
+                    "- Xe máy: Cấm triệt để khi điểm ngập ≥ 20 cm (tránh nước vào bầu lọc gió, chết máy trôi xe).\n"
+                    "- Ô tô con: Cấm triệt để khi điểm ngập ≥ 30 cm (nguy cơ thủy kích vỡ lốc máy).\n\n"
+                    f"💡 Hệ thống đang theo dõi {len(live_pts)} trạm quan trắc ngập lụt. Thuật toán $A^*$ trên NorthStar tự động định tuyến né hoàn toàn các điểm ngập nguy hiểm."
+                )
+                actions.append(SuggestedAction(label="🧭 Mở Tìm đường Né ngập", action="switch_tab", tab="route"))
+
+        elif any(prov in msg for prov in ["thái nguyên", "lào cai", "yên bái", "hà nội", "phú thọ", "phong châu", "bảo yên", "làng nủ"]):
+            lines = []
+            if "lào cai" in msg or "làng nủ" in msg or "bảo yên" in msg:
+                lines.append("- **Lào Cai / Làng Nủ (Bảo Yên):** Đang duy trì cảnh báo Lũ bùn quét cấp độ thảm họa. Trạm quan trắc ghi nhận nước lũ ~60cm, trạm sơ tán Tiểu học Bảo Yên đang mở cửa.")
+            if "yên bái" in msg:
+                lines.append("- **Yên Bái (Sông Thao):** Báo động lũ lịch sử vượt Báo động 3 (+55cm), khu vực ven sông Hồng ngập sâu. Khuyến cáo không lưu thông qua các tuyến ven đê.")
+            if "thái nguyên" in msg:
+                lines.append("- **Thái Nguyên (Sông Cầu):** Trạm Gia Bảy ghi nhận nước dâng 48cm. 3 trạm sơ tán đã mở cửa đón nhân dân tại Sân vận động và THPT Chuyên.")
+            if "phú thọ" in msg or "phong châu" in msg:
+                lines.append("- **Phú Thọ (Cầu Phong Châu):** Sự cố sập nhịp cầu Phong Châu, cấm mọi phương tiện qua lại, phân luồng sang cầu Ngọc Tháp và cầu Trung Hà.")
+
+            if lines:
+                reply = "🛰️ **CẢNH BÁO THỜI GIAN THỰC VÙNG MIỀN BẮC:**\n" + "\n".join(lines)
+            else:
+                reply = (
+                    f"🛰️ **DỮ LIỆU ĐỊA BÀN THỜI GIAN THỰC ({msg.title()}):**\n"
+                    f"- Các trạm đo đang được cập nhật liên tục qua cảm biến IoT và ảnh vệ tinh SAR Sentinel-1.\n"
+                    f"- Hệ thống có {len(shelters)} điểm sơ tán mở cửa tiếp nhận nhân dân và {len(live_pts)} trạm quan trắc tự động.\n"
+                    f"- Vui lòng kích hoạt chế độ **Bản đồ Vệ tinh / Lũ lụt** để quan sát vùng rủi ro."
+                )
             actions.append(SuggestedAction(label="🗺️ Xem Bản đồ Toàn cảnh", action="switch_tab", tab="overview"))
 
         else:
             reply = (
-                "🤖 **Trợ lý AI NorthStar (Chế độ Ngoại tuyến):**\n"
-                "Tôi có thể hỗ trợ bạn:\n"
-                "1. 🛣️ **Tra cứu ngập lụt:** Đưa ra khuyến cáo xe máy/ô tô cho từng tuyến đường.\n"
-                "2. 🛡️ **Tìm điểm sơ tán:** Hướng dẫn vị trí trạm tránh trú có lương thực và y tế.\n"
-                "3. 🆘 **Kêu cứu cứu hộ:** Kết nối đường dây nóng và phát tín hiệu định vị khẩn cấp.\n"
-                "4. 💡 **Sinh tồn thiên tai:** An toàn điện, lọc nước sạch và ứng phó lũ quét."
+                f"🤖 **Trợ lý AI Trực ban Thiên tai NorthStar (Ngoại tuyến):**\n"
+                f"Tôi đã tiếp nhận câu hỏi của bạn: *\"{query}\"*.\n\n"
+                f"Hiện tại hệ thống đang vận hành ở chế độ dự phòng bảo toàn ngoại tuyến. Tôi có thể hỗ trợ bạn trực tiếp:\n"
+                f"• 🧭 **Cẩm nang sinh tồn:** Quy tắc sống còn 3-3-3, kỹ năng khi bị cô lập, túi cứu sinh Go-Bag.\n"
+                f"• 🌾 **Ước tính lương thực:** Nhập số can gạo, thùng mì tôm để tính số ngày cầm cự và cách chia khẩu phần.\n"
+                f"• 💧 **Xử lý nước sạch & an toàn điện:** Hướng dẫn lọc nước lũ, an toàn điện khi nước tràn vào nhà.\n"
+                f"• 🏥 **Y tế & Sơ cứu:** Xử lý rắn cắn, tiêu chảy, vết thương hở trong bão lũ, phòng nước ăn chân.\n"
+                f"• 🛣️ **Tra cứu ngập lụt:** Kiểm tra tình trạng ngập cho bất kỳ tuyến đường nào.\n"
+                f"• 🆘 **Cứu nạn khẩn cấp:** Kết nối đường dây nóng 114, 112 và truyền tọa độ GPS về Ban Chỉ huy."
             )
-            actions.append(SuggestedAction(label="🧭 Tìm đường né ngập", action="switch_tab", tab="route"))
-            actions.append(SuggestedAction(label="🆘 Phát tín hiệu SOS", action="open_sos"))
+            actions.append(SuggestedAction(label="🧭 Mở Tìm đường Né ngập", action="switch_tab", tab="route"))
+            actions.append(SuggestedAction(label="🆘 Phát tín hiệu SOS khẩn cấp", action="open_sos"))
 
         return AIChatResult(
             reply=reply,
