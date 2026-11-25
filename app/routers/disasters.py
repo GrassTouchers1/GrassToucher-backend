@@ -1,11 +1,28 @@
+# Copyright 2026 GrassTouchers Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Router Quản lý Giám sát Đa thiên tai (Disaster Monitoring).
 Hỗ trợ các loại hình thiên tai: lũ lụt (flood), sạt lở (landslide), bão/cây đổ (storm), mưa lớn (heavy_rain).
 """
 import logging
 from typing import Optional, Literal
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
+from ..auth import AuthUser, record_audit_event, require_roles
 from ..db import get_db_connection
 from ..schemas import DisasterCreate
 from ..fallback_storage import get_fallback_disasters, save_fallback_disaster
@@ -82,8 +99,12 @@ def list_disasters(
 
 
 @router.post("", status_code=201)
-def create_disaster(body: DisasterCreate):
+def create_disaster(
+    body: DisasterCreate,
+    user: AuthUser = Depends(require_roles("coordinator", "admin")),
+):
     """Khai báo sự kiện hoặc vùng cảnh báo thiên tai mới."""
+    record_audit_event("disaster_created", "disaster", body.title, "success", f"severity={body.severity}", actor=user)
     try:
         with get_db_connection() as conn:
             row = conn.execute("""
@@ -102,6 +123,12 @@ def create_disaster(body: DisasterCreate):
         log.warning("DB query failed in create_disaster, using persistent fallback: %s", e)
         saved = save_fallback_disaster(body.model_dump())
         return _to_feature(saved)
+
+
+@router.get("/alerts")
+def get_disaster_alerts():
+    """Lấy danh sách các sự kiện thiên tai và vùng nguy hiểm đang kích hoạt cảnh báo."""
+    return list_disasters(hazard_type=None, active_only=True)
 
 
 @router.get("/{disaster_id}")

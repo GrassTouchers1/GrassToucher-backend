@@ -125,7 +125,14 @@ class TestPostgisAndFallbackSOS(unittest.TestCase):
 
     def test_postgis_08_list_sos_with_null_geom_no_error(self):
         """POSTGIS-08: Truy vấn danh sách SOS khi có bản ghi geom=NULL không phát sinh lỗi."""
-        res = self.client.get("/api/sos")
+        self.assertEqual(self.client.get("/api/sos").status_code, 401)
+        login_res = self.client.post("/api/auth/login", json={
+            "username": "coordinator_demo",
+            "password": os.getenv("NORTHSTAR_DEMO_PASSWORD", "NorthStarDemo@2026"),
+        })
+        self.assertEqual(login_res.status_code, 200)
+        hdrs = {"Authorization": f"Bearer {login_res.json()['access_token']}"}
+        res = self.client.get("/api/sos", headers=hdrs)
         self.assertEqual(res.status_code, 200)
         fc = res.json()
         self.assertEqual(fc["type"], "FeatureCollection")

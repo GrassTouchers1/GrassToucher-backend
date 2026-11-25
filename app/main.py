@@ -1,3 +1,19 @@
+# Copyright 2026 GrassTouchers Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -25,7 +41,10 @@ from .routers import (
     rescue_dispatch,
     ai_endpoints,
     sitrep,
+    relief_triage,
+    auth as auth_routers,
 )
+from .auth import init_auth_tables
 
 app = FastAPI(
     title="NorthStar / FloodNav API",
@@ -63,6 +82,11 @@ app.include_router(simulation.router)
 app.include_router(rescue_dispatch.router)
 app.include_router(ai_endpoints.router)
 app.include_router(sitrep.router)
+app.include_router(relief_triage.router)
+app.include_router(auth_routers.auth_router)
+app.include_router(auth_routers.admin_router)
+
+init_auth_tables()
 
 
 @app.get("/", include_in_schema=False)

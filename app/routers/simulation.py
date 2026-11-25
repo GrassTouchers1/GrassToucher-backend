@@ -1,3 +1,19 @@
+# Copyright 2026 GrassTouchers Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Router mô phỏng kịch bản ngập lụt theo dòng thời gian (Time-lapse Flood Timeline Simulator).
 Cung cấp diễn biến mực nước 155 trạm đo qua các mốc thời gian T+0h, T+3h, T+6h, T+12h, T+24h
@@ -124,6 +140,9 @@ def get_simulation_timeline(
         points = calculate_step_depths(matched_step["hour"], matched_step["rainfall_mm"])
         return {
             "scenario": scenario,
+            "simulated": True,
+            "data_type": "simulation_demo",
+            "warning": "DỮ LIỆU MÔ PHỎNG KỊCH BẢN (SIMULATED / DEMO) — Không phải số đo cảm biến thời gian thực.",
             "current_step": matched_step,
             "total_points": len(points),
             "safe_count": sum(1 for p in points if p["status"] == "safe"),
@@ -135,7 +154,10 @@ def get_simulation_timeline(
     # Trả về tổng quan toàn bộ timeline
     return {
         "scenario": scenario,
+        "simulated": True,
+        "data_type": "simulation_demo",
+        "warning": "DỮ LIỆU MÔ PHỎNG KỊCH BẢN (SIMULATED / DEMO) — Không phải số đo cảm biến thời gian thực.",
         "title": "Mô phỏng Hoàn lưu Bão số 3 (Yagi) & Lũ lụt Lịch sử Miền Bắc",
-        "description": "Kịch bản tổng hợp mô phỏng diễn biến lượng mưa từ 2mm đến 170mm và phản ứng thủy văn trên 155 trạm đo.",
+        "description": "Kịch bản tổng hợp mô phỏng diễn biến lượng mưa từ 2mm đến 170mm và phản ứng thủy văn trên hệ thống trạm đo.",
         "steps": TIMELINE_STEPS
     }

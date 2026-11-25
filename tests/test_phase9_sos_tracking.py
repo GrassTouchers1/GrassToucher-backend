@@ -84,8 +84,14 @@ class TestPhase9SOSTrackingSecurity(unittest.TestCase):
         for forbidden_key in ('phone', 'contact_name', 'lat', 'lng', 'notes', 'people_count'):
             self.assertNotIn(forbidden_key, d1)
 
-        # TRACK-10: Status updates reflect real PATCH /api/sos/{id}/status
-        p_res = self.client.patch(f'/api/sos/{sos_id}/status', json={'status': 'dispatched'})
+        # TRACK-10: Status updates reflect real PATCH /api/sos/{id}/status (authenticated as coordinator)
+        login_res = self.client.post('/api/auth/login', json={
+            'username': 'coordinator_demo',
+            'password': os.getenv('NORTHSTAR_DEMO_PASSWORD', 'NorthStarDemo@2026'),
+        })
+        self.assertEqual(login_res.status_code, 200, login_res.text)
+        coord_headers = {'Authorization': f"Bearer {login_res.json()['access_token']}"}
+        p_res = self.client.patch(f'/api/sos/{sos_id}/status', json={'status': 'dispatched'}, headers=coord_headers)
         self.assertEqual(p_res.status_code, 200, p_res.text)
         r2 = self.client.get(f'/api/sos/track/{token}')
         self.assertEqual(r2.status_code, 200)

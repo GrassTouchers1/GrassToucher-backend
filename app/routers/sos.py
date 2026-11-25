@@ -1,6 +1,22 @@
+# Copyright 2026 GrassTouchers Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """
-Router Phát Tín Hiệu Cứu Hộ Khẩn Cấp (1-Click Community SOS).
-Cho phép người dân gửi vị trí ngập sâu bị cô lập, số người cần cứu hộ và ưu tiên trợ giúp.
+Router Phat Tin Hieu Cuu Ho Khan Cap (1-Click Community SOS) & DTN Relay / Satellite Gateway.
+Tich hop phan quyen RBAC phia may chu, ownership cho Citizen va nhat ky Audit Trail.
 """
 from datetime import datetime, timedelta, timezone
 import base64
@@ -11,25 +27,33 @@ import re
 import secrets
 import time
 from typing import Dict, List, Optional
+
 import psycopg
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
+from ..auth import (
+    AuthUser,
+    get_current_user,
+    get_current_user_optional,
+    record_audit_event,
+)
 from ..db import get_db_connection
-from ..schemas import SOSCreate, SOSStatusUpdate
 from ..fallback_storage import (
     IdempotencyConflictError,
     get_fallback_sos,
+    get_fallback_sos_by_id,
     get_fallback_sos_by_token_hash,
     revoke_fallback_sos_token,
     save_fallback_sos,
     update_fallback_sos_status,
 )
+from ..schemas import SOSCreate, SOSStatusUpdate
 
 log = logging.getLogger("northstar.sos")
-router = APIRouter(prefix="/api/sos", tags=["Cứu hộ khẩn cấp SOS"])
+router = APIRouter(prefix="/api/sos", tags=["Cuu ho khan cap SOS"])
 
 TRACKING_TOKEN_TTL_DAYS = 7
 _TRACK_RATE_LIMIT_MAX = 20
@@ -38,11 +62,16 @@ _TRACK_RATE_BUCKETS: Dict[str, List[float]] = {}
 
 _CITIZEN_STATUS_MAP = {
     "pending": ("RECEIVED", "Đã tiếp nhận yêu cầu SOS, đang chờ cán bộ xác minh."),
+    "verified": ("VERIFIED", "Trung tâm Chỉ huy đã xác minh thực địa hồ sơ SOS."),
     "acknowledged": ("VERIFIED", "Trung tâm Chỉ huy đã xác nhận hồ sơ, đang chuẩn bị điều phối."),
     "dispatched": ("DISPATCHED", "Đội cứu hộ đang trên đường tiếp cận vị trí của bạn."),
+    "on_scene": ("DISPATCHED", "Đội cứu hộ đã có mặt tại hiện trường tiếp cận nạn nhân."),
     "rescued": ("RESCUED", "Đã hoàn tất cứu hộ an toàn."),
     "cancelled": ("CANCELLED", "Hồ sơ SOS đã được hủy."),
 }
+
+RESCUE_ALLOWED_STATUSES = {"acknowledged", "on_scene", "rescued"}
+COORDINATOR_ALLOWED_STATUSES = {"pending", "verified", "acknowledged", "dispatched", "on_scene", "rescued", "cancelled"}
 
 
 def _hash_tracking_token(token: str) -> str:
@@ -74,7 +103,7 @@ def _format_public_track_response(row: dict) -> dict:
         "status": citizen_status,
         "raw_status": raw_status,
         "guidance": guidance,
-        "progress_confirmed": raw_status in ("dispatched", "rescued"),
+        "progress_confirmed": raw_status in ("dispatched", "on_scene", "rescued"),
         "received_at": str(row.get("created_at")),
         "updated_at": str(row.get("updated_at")),
         "source": "NORTHSTAR Command",
@@ -106,7 +135,7 @@ def _to_feature(r: dict) -> dict:
     geometry = (
         {
             "type": "Point",
-            "coordinates": [float(r["lng"]), float(r["lat"])]
+            "coordinates": [float(r["lng"]), float(r["lat"])],
         }
         if has_coords
         else None
@@ -130,6 +159,7 @@ def _to_feature(r: dict) -> dict:
             "priority": r["priority"],
             "status": r["status"],
             "notes": r.get("notes"),
+            "owner_user_id": r.get("owner_user_id"),
             "client_event_id": r.get("client_event_id"),
             "idempotent_replay": bool(r.get("idempotent_replay", False)),
             "deduplicated": bool(r.get("deduplicated", r.get("idempotent_replay", False))),
@@ -141,23 +171,14 @@ def _to_feature(r: dict) -> dict:
             **({"tracking_token": r["tracking_token"]} if r.get("tracking_token") else {}),
             "created_at": str(r.get("created_at")),
             "updated_at": str(r.get("updated_at")),
-        }
+        },
     }
 
 
-@router.get("")
-def list_sos_beacons(
-    request: Request,
-    status: Optional[str] = Query(None, description="Lọc theo trạng thái: pending, acknowledged, dispatched, rescued")
-):
-    """Danh sách các tín hiệu SOS kêu cứu từ người dân (Chỉ dành cho Command, chặn Citizen)."""
-    if (request.headers.get("x-northstar-client") or "").strip().lower() == "citizen":
-        raise HTTPException(
-            status_code=403,
-            detail="Phân hệ Citizen không được phép truy cập danh sách SOS nội bộ. Hãy dùng /api/sos/track/{tracking_token}.",
-        )
-    if not isinstance(status, str):
-        status = None
+def _fetch_sos_collection(status_filter: Optional[str] = None, owner_user_id: Optional[int] = None) -> dict:
+    """Ham noi bo truy van danh sach SOS cho cac router tac chien (rescue_dispatch, sitrep)."""
+    if not isinstance(status_filter, str):
+        status_filter = None
     try:
         with get_db_connection() as conn:
             sql = """
@@ -171,27 +192,63 @@ def list_sos_beacons(
                 FROM community_sos
             """
             params = []
-            if status:
+            if status_filter:
                 sql += " WHERE status = %s::sos_status"
-                params.append(status)
+                params.append(status_filter)
             sql += " ORDER BY id DESC"
-
             rows = conn.execute(sql, tuple(params)).fetchall()
-            return {
-                "type": "FeatureCollection",
-                "features": [_to_feature(r) for r in rows]
-            }
+            if owner_user_id is None:
+                return {"type": "FeatureCollection", "features": [_to_feature(dict(r)) for r in rows]}
     except Exception as e:
-        log.warning("DB query failed in list_sos_beacons, using fallback: %s", e)
-        fb_rows = get_fallback_sos(status=status)
-        return {
-            "type": "FeatureCollection",
-            "features": [_to_feature(r) for r in fb_rows]
-        }
+        log.warning("DB query failed in _fetch_sos_collection, using fallback: %s", e)
+
+    fb_rows = get_fallback_sos(status=status_filter, owner_user_id=owner_user_id)
+    return {"type": "FeatureCollection", "features": [_to_feature(r) for r in fb_rows]}
+
+
+@router.get("")
+def list_sos_beacons(
+    request: Request,
+    status_filter: Optional[str] = Query(None, alias="status", description="Lọc theo trạng thái: pending, acknowledged, dispatched, rescued"),
+    user: Optional[AuthUser] = Depends(get_current_user_optional),
+):
+    """Danh sách các tín hiệu SOS kêu cứu (Chỉ dành cho Rescue, Coordinator, Admin)."""
+    if (request.headers.get("x-northstar-client") or "").strip().lower() == "citizen" and (not user or user.role == "citizen"):
+        record_audit_event("sos_list_forbidden_citizen", "sos", None, "denied_403", "Citizen client header blocked", actor=user)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Phân hệ Citizen không được phép truy cập danh sách SOS nội bộ. Hãy dùng /api/sos/track/{tracking_token} hoặc /api/sos/mine.",
+        )
+    if user is None:
+        record_audit_event("sos_list_unauthorized", "sos", None, "denied_401", "Unauthenticated GET /api/sos")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Yêu cầu đăng nhập vai trò Cứu hộ hoặc Điều phối để xem danh sách SOS.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if user.role not in ("rescue", "coordinator", "admin"):
+        record_audit_event("sos_list_forbidden_role", "sos", None, "denied_403", f"Role '{user.role}' forbidden", actor=user)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Vai trò '{user.role}' không có quyền truy cập danh sách SOS toàn hệ thống.",
+        )
+    return _fetch_sos_collection(status_filter=status_filter)
+
+
+@router.get("/mine")
+def list_my_sos_beacons(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    user: AuthUser = Depends(get_current_user),
+):
+    """Nguoi dan chi xem duoc cac ho so SOS do chinh tai khoan minh tao."""
+    return _fetch_sos_collection(status_filter=status_filter, owner_user_id=user.id)
 
 
 @router.post("", status_code=201)
-def create_sos_beacon(body: SOSCreate):
+def create_sos_beacon(
+    body: SOSCreate,
+    user: Optional[AuthUser] = Depends(get_current_user_optional),
+):
     """Gửi tín hiệu kêu cứu khẩn cấp SOS kèm toạ độ (hoặc mô tả địa điểm khi mất GPS) và idempotency."""
     has_coords = (body.lng is not None) and (body.lat is not None)
     payload_hash = compute_sos_payload_hash(body) if body.client_event_id else None
@@ -199,6 +256,7 @@ def create_sos_beacon(body: SOSCreate):
     token_hash = _hash_tracking_token(raw_tracking_token)
     token_expires_dt = datetime.now(timezone.utc) + timedelta(days=TRACKING_TOKEN_TTL_DAYS)
     token_expires_iso = token_expires_dt.isoformat()
+    owner_user_id = user.id if isinstance(user, AuthUser) else None
 
     try:
         with get_db_connection() as conn:
@@ -265,6 +323,7 @@ def create_sos_beacon(body: SOSCreate):
                     )).fetchone()
                 d = dict(row)
                 d["tracking_token"] = raw_tracking_token
+                d["owner_user_id"] = owner_user_id
                 return _to_feature(d)
             except psycopg.errors.UniqueViolation:
                 conn.rollback()
@@ -283,7 +342,6 @@ def create_sos_beacon(body: SOSCreate):
                 """, (body.client_event_id,)).fetchone()
                 if existing:
                     if existing.get("payload_hash") and payload_hash and existing["payload_hash"] != payload_hash:
-                        log.warning("Idempotency conflict on SOS client_event_id=%s", body.client_event_id)
                         raise HTTPException(409, "Xung đột dữ liệu: client_event_id đã tồn tại với nội dung khác.")
                     d = dict(existing)
                     d["idempotent_replay"] = True
@@ -301,6 +359,7 @@ def create_sos_beacon(body: SOSCreate):
         fb_data["tracking_token_hash"] = token_hash
         fb_data["tracking_token_expires_at"] = token_expires_iso
         fb_data["tracking_token_revoked"] = 0
+        fb_data["owner_user_id"] = owner_user_id
         saved = save_fallback_sos(fb_data)
     except IdempotencyConflictError:
         log.warning("Idempotency conflict (fallback) on SOS client_event_id=%s", body.client_event_id)
@@ -310,6 +369,7 @@ def create_sos_beacon(body: SOSCreate):
         raise HTTPException(500, "Không thể lưu hồ sơ cứu hộ SOS trên máy chủ.")
     if not saved.get("idempotent_replay"):
         saved["tracking_token"] = raw_tracking_token
+    record_audit_event("sos_created", "sos", str(saved.get("id")), "success", f"priority={body.priority}", actor=user if isinstance(user, AuthUser) else None)
     return _to_feature(saved)
 
 
@@ -382,7 +442,6 @@ def _b64url_to_int(val: str) -> int:
 
 def _verify_relay_integrity_and_signature(packet: dict) -> bool:
     """Xác thực SHA-256 và chữ ký ECDSA-P256 nếu gói tin có kèm metadata bảo mật."""
-    # 1. Xác thực SHA-256
     integ = packet.get("integrity_metadata") or {}
     provided_hash = packet.get("payload_sha256") or integ.get("content_hash")
     if provided_hash:
@@ -407,11 +466,10 @@ def _verify_relay_integrity_and_signature(packet: dict) -> bool:
         if str(provided_hash).lower() != expected.lower():
             raise HTTPException(422, "Gói tin Relay không khớp mã băm toàn vẹn SHA-256.")
 
-    # 2. Xác thực ECDSA-P256
-    auth = packet.get("authentication_metadata") or {}
-    sig_b64 = packet.get("signature") or auth.get("signature")
-    pub_jwk = packet.get("public_key") or auth.get("public_key_jwk")
-    scheme = auth.get("scheme") or ("ECDSA-P256" if (sig_b64 and pub_jwk) else "NONE")
+    auth_meta = packet.get("authentication_metadata") or {}
+    sig_b64 = packet.get("signature") or auth_meta.get("signature")
+    pub_jwk = packet.get("public_key") or auth_meta.get("public_key_jwk")
+    scheme = auth_meta.get("scheme") or ("ECDSA-P256" if (sig_b64 and pub_jwk) else "NONE")
     if scheme == "ECDSA-P256" and sig_b64 and pub_jwk:
         try:
             if isinstance(pub_jwk, str):
@@ -574,7 +632,6 @@ def receive_gateway_inbound_sos(body: dict):
     else:
         raise HTTPException(422, "Thiếu compact_frame hoặc sms_text.")
 
-    # Auto-Triage theo mực nước + ưu tiên khung
     if water_level_cm >= 200 or frame_prio == "critical":
         triaged_prio = "critical"
     elif water_level_cm >= 100 or frame_prio == "high":
@@ -616,8 +673,34 @@ def receive_gateway_inbound_sos(body: dict):
 
 
 @router.patch("/{sos_id}/status")
-def update_sos_status(sos_id: int, body: SOSStatusUpdate):
-    """Cập nhật trạng thái xử lý cứu hộ (điều phối đội cứu hộ, xác nhận đã an toàn)."""
+def update_sos_status(
+    sos_id: int,
+    body: SOSStatusUpdate,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Cập nhật trạng thái xử lý cứu hộ theo RBAC + kiểm tra ownership cho Citizen."""
+    existing = get_fallback_sos_by_id(sos_id)
+
+    if user.role == "citizen":
+        # Citizen chỉ được phép HỦY đúng hồ sơ do chính tài khoản mình tạo (chống IDOR)
+        if not existing:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, f"Không tìm thấy yêu cầu cứu hộ SOS id={sos_id}")
+        if existing.get("owner_user_id") != user.id:
+            record_audit_event("sos_idor_attempt", "sos", str(sos_id), "denied_403", f"Citizen {user.username} attempted modify sos {sos_id}", actor=user)
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Bạn không có quyền thao tác trên hồ sơ SOS của người khác.")
+        if body.status != "cancelled":
+            record_audit_event("sos_privilege_denied", "sos", str(sos_id), "denied_403", f"Citizen attempted set status={body.status}", actor=user)
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Người dân chỉ có thể hủy (cancelled) hồ sơ SOS của chính mình.")
+    elif user.role == "rescue":
+        if body.status not in RESCUE_ALLOWED_STATUSES:
+            record_audit_event("sos_rescue_status_denied", "sos", str(sos_id), "denied_403", f"Rescue attempted set status={body.status}", actor=user)
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                f"Đội cứu hộ chỉ được cập nhật trạng thái hiện trường {sorted(RESCUE_ALLOWED_STATUSES)}.",
+            )
+    elif user.role not in ("coordinator", "admin"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, f"Vai trò '{user.role}' không có quyền cập nhật trạng thái SOS.")
+
     try:
         with get_db_connection() as conn:
             row = conn.execute("""
@@ -633,12 +716,14 @@ def update_sos_status(sos_id: int, body: SOSStatusUpdate):
                           priority, status, notes, created_at, updated_at
             """, (body.status, sos_id)).fetchone()
             if row:
+                record_audit_event("sos_status_updated", "sos", str(sos_id), "success", f"status={body.status}", actor=user)
                 return _to_feature(dict(row))
     except Exception as e:
         log.warning("DB query failed in update_sos_status, using fallback: %s", e)
 
     updated = update_fallback_sos_status(sos_id, body.status)
     if updated:
+        record_audit_event("sos_status_updated", "sos", str(sos_id), "success", f"status={body.status}", actor=user)
         return _to_feature(updated)
 
     raise HTTPException(404, f"Không tìm thấy yêu cầu cứu hộ SOS id={sos_id}")

@@ -2,6 +2,10 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![OSI Approved](https://img.shields.io/badge/OSI-Approved%20Open%20Source-brightgreen.svg)](https://opensource.org/licenses)
+[![Changelog](https://img.shields.io/badge/Changelog-Keep%20a%20Changelog-orange.svg)](CHANGELOG.md)
+[![Building from Source](https://img.shields.io/badge/Build-From%20Source-blue.svg)](INSTALL.md)
+[![Release](https://img.shields.io/badge/Release-v1.0.0-green.svg)](https://github.com/GrassTouchers1/GrassToucher-backend/releases)
+[![Bug Tracker](https://img.shields.io/badge/Bug%20Tracker-GitHub%20Issues-red.svg)](https://github.com/GrassTouchers1/GrassToucher-backend/issues)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20%2B%20PostGIS-336791.svg?logo=postgresql)](https://postgis.net/)
 [![Alembic](https://img.shields.io/badge/Migrations-Alembic-red.svg)](https://alembic.sqlalchemy.org/)
@@ -177,15 +181,23 @@ OK
 
 ## 🌍 6. Nguồn Dữ liệu Mở & Tính Pháp lý Bản quyền (Open Data Compliance)
 
-Hệ thống tuân thủ nghiêm ngặt nguyên tắc **100% Open Data & Open Source**, tra cứu minh bạch qua `GET /api/data-sources`:
+Hệ thống tuân thủ nghiêm ngặt nguyên tắc **100% Open Data & Open Source** (Chuẩn mở quốc tế FOSS/OSI, tuyệt đối không cào web lậu, không sử dụng API đóng), tra cứu minh bạch qua `GET /api/data-sources`:
 - **[OpenStreetMap (OSM)](https://www.openstreetmap.org)**: Giấy phép ODbL 1.0 (Open Data) - Mạng lưới giao thông và không gian đô thị.
 - **[Copernicus Sentinel-1 SAR](https://dataspace.copernicus.eu)**: EU Copernicus Open Access Policy - Viễn thám radar vệ tinh xuyên mây bão bóc tách vết ngập bề mặt 24/7.
-- **[Trung tâm Dự báo KTTV Quốc gia (NCHMF)](https://nchmf.gov.vn)**: Dữ liệu công ích (Nghị định 47/2020/NĐ-CP) - Cấp độ báo động lũ & cảnh báo khẩn cấp.
-- **[Open Development Mekong (ODM)](https://data.vietnam.opendevelopmentmekong.net)**: Giấy phép CC-BY 4.0 - Thủy văn sông ngòi, lưu vực sông Hồng - Thái Bình và hồ chứa thủy điện.
-- **[Open-Meteo Weather API](https://open-meteo.com)**: Giấy phép CC-BY 4.0 - Dự báo lượng mưa thời gian thực.
+- **[Copernicus GloFAS (Global Flood Awareness System)](https://www.globalfloods.eu)**: EU Copernicus Policy - Cảnh báo lũ sớm, lưu lượng xả đáy và dòng chảy sông ngòi quốc tế.
+- **[Open-Meteo Weather API](https://open-meteo.com)**: Giấy phép CC-BY 4.0 - Dự báo nhiệt độ, sức gió và lượng mưa thời gian thực.
+- **[OpenAQ Air Quality Network](https://openaq.org)**: Giấy phép CC-BY 4.0 - Mạng lưới 18 trạm quan trắc chất lượng không khí, chỉ số US AQI, bụi mịn PM2.5, PM10, CO, NO₂.
+- **[NASA GPM IMERG](https://gpm.nasa.gov)**: NASA Open Data Policy - Đo lượng mưa vệ tinh viễn thám mở toàn cầu.
 
 ---
 
-## 📄 7. Giấy phép Bản quyền (License)
-Phát hành theo giấy phép **Apache License 2.0 (OSI-Approved)**. Xem chi tiết tại [LICENSE](LICENSE).  
-Quy định tham gia đóng góp: [CONTRIBUTING.md](CONTRIBUTING.md).
+## 📄 7. Tuyên Bố Giấy Phép & Tuân Thủ Chuẩn Mã Nguồn Mở (OSI & PoF Compliance)
+
+Toàn bộ phân hệ Backend được phát hành và kiểm định nghiêm ngặt theo các tiêu chuẩn mã nguồn mở quốc tế:
+- ⚖️ **Giấy phép phần mềm:** [Apache License 2.0](LICENSE) (OSI-Approved, `SPDX-License-Identifier: Apache-2.0` gắn trên từng tệp mã nguồn).
+- 📋 **Báo cáo kiểm định bản quyền:** [docs/LICENSE_AUDIT.md](docs/LICENSE_AUDIT.md).
+- 📦 **Hướng dẫn dịch & cài đặt từ mã nguồn sạch:** [INSTALL.md](INSTALL.md).
+- 📝 **Lịch sử phiên bản phát hành:** [CHANGELOG.md](CHANGELOG.md) (Chuẩn Keep a Changelog v1.1.0 & Semantic Versioning v2.0.0).
+- 🤝 **Quy chuẩn đóng góp:** [CONTRIBUTING.md](CONTRIBUTING.md).
+- 🐛 **Hệ thống Quản lý Lỗi (Bug Tracker):** Tiếp nhận tại [GitHub Issues](https://github.com/GrassTouchers1/GrassToucher-backend/issues) với Issue Templates chuẩn trong `.github/ISSUE_TEMPLATE/`.
+- 🏷️ **Bản phát hành chính thức dự thi:** [Release v1.0.0](https://github.com/GrassTouchers1/GrassToucher-backend/releases/tag/v1.0.0).

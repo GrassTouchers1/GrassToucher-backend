@@ -1,3 +1,19 @@
+# Copyright 2026 GrassTouchers Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Router Điều phối Cứu hộ Đa điểm Thông minh (Multi-Stop Rescue Dispatch Optimization).
 Tối ưu hóa thứ tự tiếp cận nhiều điểm SOS dựa trên:
@@ -10,9 +26,10 @@ Tối ưu hóa thứ tự tiếp cận nhiều điểm SOS dựa trên:
 import math
 from typing import Any, Optional
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
-from .sos import list_sos_beacons
+from ..auth import AuthUser, record_audit_event, require_roles
+from .sos import _fetch_sos_collection
 from .shelters import list_shelters
 
 router = APIRouter(prefix="/api/rescue", tags=["Điều phối Cứu hộ Đa điểm"])
@@ -34,9 +51,13 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return R * c
 
 @router.post("/dispatch", summary="Lập kế hoạch tối ưu cứu hộ đa điểm tuần tự")
-def optimize_rescue_dispatch(req: DispatchRequest) -> dict[str, Any]:
+def optimize_rescue_dispatch(
+    req: DispatchRequest,
+    user: AuthUser = Depends(require_roles("rescue", "coordinator", "admin")),
+) -> dict[str, Any]:
     # Lấy toàn bộ SOS beacons hiện có
-    sos_geojson = list_sos_beacons()
+    sos_geojson = _fetch_sos_collection()
+    record_audit_event("rescue_dispatch_plan", "dispatch", req.team_name, "success", f"vehicle={req.vehicle_type}", actor=user)
     all_beacons = {f["properties"]["id"]: f for f in sos_geojson.get("features", [])}
 
     target_beacons = []

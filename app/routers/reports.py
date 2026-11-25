@@ -1,11 +1,28 @@
+# Copyright 2026 GrassTouchers Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Báo cáo ngập của người dân (crowdsourcing) + logic xác nhận."""
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import logging
 import psycopg
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 
+from ..auth import AuthUser, record_audit_event, require_roles
 from ..db import pool, get_db_connection
 from ..schemas import ReportClear, ReportCreate
 from ..fallback_storage import (
@@ -18,18 +35,6 @@ from ..fallback_storage import (
 
 log = logging.getLogger("floodnav.reports")
 router = APIRouter(prefix="/api/reports", tags=["Báo cáo của người dân"])
-
-
-def compute_report_payload_hash(body: ReportCreate) -> str:
-    canonical = {
-        "lng": body.lng,
-        "lat": body.lat,
-        "level": body.level,
-        "user_id": body.user_id,
-        "photo_url": body.photo_url,
-    }
-    raw = json.dumps(canonical, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 # --- Tham số quy tắc xác nhận ---
 CONFIRM_RADIUS_M = 100       # bán kính gom các báo cáo gần nhau
@@ -47,6 +52,18 @@ POINT = "ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography"
 # Báo cáo dự phòng được chuyển sang lưu trữ bền vững tại fallback_storage.db
 
 
+def compute_report_payload_hash(body: ReportCreate) -> str:
+    canonical = {
+        "lng": body.lng,
+        "lat": body.lat,
+        "level": body.level,
+        "user_id": body.user_id,
+        "photo_url": body.photo_url,
+    }
+    raw = json.dumps(canonical, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 @router.post("", status_code=201)
 def create_report(body: ReportCreate):
     payload_hash = compute_report_payload_hash(body) if body.client_event_id else None
@@ -61,13 +78,14 @@ def create_report(body: ReportCreate):
                 ).fetchone()
             except psycopg.errors.UniqueViolation:
                 conn.rollback()
+                if not body.client_event_id:
+                    raise
                 existing = conn.execute(
-                    "SELECT id, level, confirmed, expires_at, payload_hash FROM reports WHERE client_event_id = %s",
+                    "SELECT id, level, confirmed, created_at, expires_at, payload_hash FROM reports WHERE client_event_id = %s",
                     (body.client_event_id,),
                 ).fetchone()
                 if existing:
                     if existing.get("payload_hash") and payload_hash and existing["payload_hash"] != payload_hash:
-                        log.warning("Idempotency conflict on Report client_event_id=%s", body.client_event_id)
                         raise HTTPException(409, "Xung đột dữ liệu: client_event_id báo ngập đã tồn tại với nội dung khác.")
                     return {
                         "id": existing["id"],
@@ -148,7 +166,6 @@ def create_report(body: ReportCreate):
                 payload_hash=payload_hash,
             )
         except IdempotencyConflictError:
-            log.warning("Idempotency conflict (fallback) on Report client_event_id=%s", body.client_event_id)
             raise HTTPException(409, "Xung đột dữ liệu: client_event_id báo ngập đã tồn tại với nội dung khác.")
 
 
@@ -195,7 +212,7 @@ def list_reports(only_confirmed: bool = False):
                     "id": r["id"],
                     "level": r["level"],
                     "estimated_depth_cm": LEVEL_DEPTH_CM.get(r["level"], 15),
-                    "confirmed": bool(r.get("confirmed", False)),
+                    "confirmed": r.get("confirmed", True),
                     "created_at": r.get("created_at"),
                     "expires_at": r.get("expires_at"),
                 },
@@ -209,8 +226,12 @@ def list_reports(only_confirmed: bool = False):
 
 
 @router.post("/clear")
-def clear_reports(body: ReportClear):
-    """Người dân báo 'đã hết ngập': hết hạn mọi báo cáo còn hiệu lực trong bán kính 100 m."""
+def clear_reports(
+    body: ReportClear,
+    user: AuthUser = Depends(require_roles("coordinator", "admin")),
+):
+    """Cán bộ xác nhận 'đã hết ngập': hết hạn mọi báo cáo còn hiệu lực trong bán kính 100 m."""
+    record_audit_event("reports_clear", "reports", f"{body.lng},{body.lat}", "success", None, actor=user)
     try:
         with get_db_connection() as conn:
             rows = conn.execute(
@@ -227,7 +248,11 @@ def clear_reports(body: ReportClear):
 
 
 @router.delete("/{report_id}", status_code=204)
-def delete_report(report_id: int):
+def delete_report(
+    report_id: int,
+    user: AuthUser = Depends(require_roles("coordinator", "admin")),
+):
+    record_audit_event("report_delete", "reports", str(report_id), "success", None, actor=user)
     try:
         with get_db_connection() as conn:
             row = conn.execute("DELETE FROM reports WHERE id = %s RETURNING id", (report_id,)).fetchone()

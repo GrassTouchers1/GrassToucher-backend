@@ -1,3 +1,19 @@
+# Copyright 2026 GrassTouchers Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Cơ chế lưu trữ bền vững dự phòng (Persistent Fallback Storage) khi PostgreSQL không hoạt động.
 Sử dụng SQLite với cơ chế khoá file và WAL để đảm bảo:
@@ -6,13 +22,13 @@ Sử dụng SQLite với cơ chế khoá file và WAL để đảm bảo:
 - Tách biệt hoàn toàn số đo quan trắc khỏi danh mục trạm ngập mặc định (DEFAULT_FLOOD_POINTS)
 """
 import json
-import sqlite3
 import logging
-import threading
-from pathlib import Path
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional
+import sqlite3
 import tempfile
+import threading
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+from typing import Dict, List, Optional
 
 log = logging.getLogger("floodnav.fallback_storage")
 _FALLBACK_WRITE_LOCK = threading.Lock()
@@ -130,12 +146,54 @@ def init_fallback_db():
                     priority TEXT DEFAULT 'high',
                     status TEXT DEFAULT 'pending',
                     notes TEXT,
+                    owner_user_id INTEGER,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS fallback_relief_requests (
+                    id TEXT PRIMARY KEY,
+                    contact_name TEXT,
+                    phone TEXT,
+                    lng REAL,
+                    lat REAL,
+                    location_text TEXT,
+                    people_count INTEGER,
+                    water_level_m REAL,
+                    water_trend TEXT DEFAULT 'unknown',
+                    vulnerable_people TEXT,
+                    medical_emergency INTEGER DEFAULT 0,
+                    immediate_danger INTEGER DEFAULT 0,
+                    mobility_status TEXT DEFAULT 'unknown',
+                    relief_needs TEXT,
+                    raw_ai_priority TEXT DEFAULT 'P3',
+                    final_priority TEXT DEFAULT 'P3',
+                    priority_reasons TEXT,
+                    guardrails_applied TEXT,
+                    was_downgrade_prevented INTEGER DEFAULT 0,
+                    verification_status TEXT DEFAULT 'needs_verification',
+                    requires_human_review INTEGER DEFAULT 1,
+                    status TEXT DEFAULT 'awaiting_dispatch',
+                    full_triage_json TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_fb_relief_priority ON fallback_relief_requests(final_priority, created_at);
+
+                CREATE TABLE IF NOT EXISTS fallback_relief_audit (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    request_id TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    actor TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    old_priority TEXT,
+                    new_priority TEXT,
+                    reason TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_fb_relief_audit_req ON fallback_relief_audit(request_id);
             """)
 
-            # Di trú an toàn bảng fallback_sos cũ nếu thiếu các cột vị trí mở rộng hoặc lng/lat vẫn NOT NULL
+            # Di tru an toan bang fallback_sos / fallback_reports / fallback_relief_requests
             table_info = conn.execute("PRAGMA table_info(fallback_sos)").fetchall()
             existing_sos_cols = {row[1] for row in table_info}
             lng_notnull = any(row[1] == "lng" and row[3] == 1 for row in table_info)
@@ -146,6 +204,7 @@ def init_fallback_db():
                 ("location_confirmed", "INTEGER DEFAULT 0"),
                 ("location_description", "TEXT"),
                 ("location_landmark", "TEXT"),
+                ("owner_user_id", "INTEGER"),
                 ("client_event_id", "TEXT"),
                 ("payload_hash", "TEXT"),
                 ("tracking_token_hash", "TEXT"),
@@ -161,25 +220,7 @@ def init_fallback_db():
             for col_name, col_def in sos_migrations:
                 if col_name not in existing_sos_cols:
                     conn.execute(f"ALTER TABLE fallback_sos ADD COLUMN {col_name} {col_def}")
-            conn.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_fb_sos_client_event_id
-                ON fallback_sos(client_event_id) WHERE client_event_id IS NOT NULL
-            """)
-            conn.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_fb_sos_tracking_token_hash
-                ON fallback_sos(tracking_token_hash) WHERE tracking_token_hash IS NOT NULL
-            """)
 
-            existing_rep_cols = {
-                row[1] for row in conn.execute("PRAGMA table_info(fallback_reports)").fetchall()
-            }
-            for col_name, col_def in [("client_event_id", "TEXT"), ("payload_hash", "TEXT")]:
-                if col_name not in existing_rep_cols:
-                    conn.execute(f"ALTER TABLE fallback_reports ADD COLUMN {col_name} {col_def}")
-            conn.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_fb_reports_client_event_id
-                ON fallback_reports(client_event_id) WHERE client_event_id IS NOT NULL
-            """)
             if lng_notnull:
                 conn.executescript("""
                     CREATE TABLE IF NOT EXISTS fallback_sos_v2 (
@@ -200,6 +241,18 @@ def init_fallback_db():
                         priority TEXT DEFAULT 'high',
                         status TEXT DEFAULT 'pending',
                         notes TEXT,
+                        owner_user_id INTEGER,
+                        client_event_id TEXT,
+                        payload_hash TEXT,
+                        tracking_token_hash TEXT,
+                        tracking_token_expires_at TEXT,
+                        tracking_token_revoked INTEGER DEFAULT 0,
+                        ingest_channel TEXT DEFAULT 'direct_online',
+                        hop_count INTEGER DEFAULT 0,
+                        signature_verified INTEGER DEFAULT 0,
+                        origin_created_at TEXT,
+                        relayed_at TEXT,
+                        relay_hops_json TEXT,
                         created_at TEXT NOT NULL,
                         updated_at TEXT NOT NULL
                     );
@@ -208,17 +261,53 @@ def init_fallback_db():
                         location_source, location_accuracy_m, location_captured_at,
                         location_confirmed, location_description, location_landmark,
                         people_count, has_elderly_or_children, water_level_cm,
-                        priority, status, notes, created_at, updated_at
+                        priority, status, notes, owner_user_id,
+                        client_event_id, payload_hash,
+                        tracking_token_hash, tracking_token_expires_at, tracking_token_revoked,
+                        ingest_channel, hop_count, signature_verified,
+                        origin_created_at, relayed_at, relay_hops_json,
+                        created_at, updated_at
                     )
                     SELECT id, contact_name, phone, lng, lat,
                            location_source, location_accuracy_m, location_captured_at,
                            location_confirmed, location_description, location_landmark,
                            people_count, has_elderly_or_children, water_level_cm,
-                           priority, status, notes, created_at, updated_at
+                           priority, status, notes, owner_user_id,
+                           client_event_id, payload_hash,
+                           tracking_token_hash, tracking_token_expires_at, tracking_token_revoked,
+                           ingest_channel, hop_count, signature_verified,
+                           origin_created_at, relayed_at, relay_hops_json,
+                           created_at, updated_at
                     FROM fallback_sos;
                     DROP TABLE fallback_sos;
                     ALTER TABLE fallback_sos_v2 RENAME TO fallback_sos;
                 """)
+
+            conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_fb_sos_client_event_id
+                ON fallback_sos(client_event_id) WHERE client_event_id IS NOT NULL
+            """)
+            conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_fb_sos_tracking_token_hash
+                ON fallback_sos(tracking_token_hash) WHERE tracking_token_hash IS NOT NULL
+            """)
+
+            existing_rep_cols = {
+                row[1] for row in conn.execute("PRAGMA table_info(fallback_reports)").fetchall()
+            }
+            for col_name, col_def in [("client_event_id", "TEXT"), ("payload_hash", "TEXT")]:
+                if col_name not in existing_rep_cols:
+                    conn.execute(f"ALTER TABLE fallback_reports ADD COLUMN {col_name} {col_def}")
+            conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_fb_reports_client_event_id
+                ON fallback_reports(client_event_id) WHERE client_event_id IS NOT NULL
+            """)
+
+            existing_rel_cols = {
+                row[1] for row in conn.execute("PRAGMA table_info(fallback_relief_requests)").fetchall()
+            }
+            if "owner_user_id" not in existing_rel_cols:
+                conn.execute("ALTER TABLE fallback_relief_requests ADD COLUMN owner_user_id INTEGER")
 
             # Seed default disasters if empty
             count = conn.execute("SELECT COUNT(*) FROM fallback_disasters").fetchone()[0]
@@ -242,7 +331,7 @@ def init_fallback_db():
                     ("Điểm ngập úng đô thị Cầu Giấy - Hoa Bằng", "flood", "medium", "active", "Mực nước ngập 35cm sau cơn mưa lớn kéo dài, các phương tiện xe máy di chuyển khó khăn.", 105.7950, 21.0220, 300.0, now_iso, now_iso)
                 ])
 
-            # Bổ sung đầy đủ thiên tai đặc trưng các tỉnh Phía Bắc (sạt lở đất đá, lũ quét, bão/triều cường, tràn đê)
+            # Bo sung thien tai dac trung cac tinh Phia Bac
             existing_disaster_titles = {
                 row[0].strip().lower()
                 for row in conn.execute("SELECT title FROM fallback_disasters").fetchall()
@@ -305,7 +394,6 @@ def init_fallback_db():
                     ("Trường Tiểu học Nam Phương Tiến A (Điểm tránh lũ Chương Mỹ)", "Xã Nam Phương Tiến, Chương Mỹ, Hà Nội", 105.6620, 20.8960, 500, 210, "024-3386-7788", "Đã tiếp nhận lương khô, áo phao và thuốc men", "open", now_iso)
                 ])
 
-            # Bổ sung đầy đủ điểm sơ tán khu vực Phía Bắc từ dữ liệu mở Wikidata (CC0-1.0)
             northern_json = Path(__file__).resolve().parent.parent / "data" / "northern_shelters.json"
             if northern_json.exists():
                 try:
@@ -481,7 +569,6 @@ def save_fallback_report(
     exp = now + timedelta(minutes=45)
     now_iso = now.isoformat()
     exp_iso = exp.isoformat()
-    idempotent_replay = False
     with _FALLBACK_WRITE_LOCK:
         try:
             init_fallback_db()
@@ -545,7 +632,7 @@ def save_fallback_report(
         "need_more": 0,
         "expires_at": exp_iso,
         "client_event_id": client_event_id,
-        "idempotent_replay": idempotent_replay,
+        "idempotent_replay": False,
     }
 
 
@@ -701,7 +788,7 @@ def save_fallback_shelter(data: dict) -> dict:
 # COMMUNITY SOS FALLBACK STORAGE
 # ==========================================
 
-def get_fallback_sos(status: Optional[str] = None) -> List[dict]:
+def get_fallback_sos(status: Optional[str] = None, owner_user_id: Optional[int] = None) -> List[dict]:
     try:
         with _get_connection() as conn:
             sql = """
@@ -709,15 +796,21 @@ def get_fallback_sos(status: Optional[str] = None) -> List[dict]:
                        location_source, location_accuracy_m, location_captured_at,
                        location_confirmed, location_description, location_landmark,
                        people_count, has_elderly_or_children, water_level_cm,
-                       priority, status, notes, created_at, updated_at,
-                       ingest_channel, hop_count, signature_verified,
+                       priority, status, notes, owner_user_id, created_at, updated_at,
+                       client_event_id, ingest_channel, hop_count, signature_verified,
                        origin_created_at, relayed_at, relay_hops_json
                 FROM fallback_sos
             """
+            clauses = []
             params = []
             if status:
-                sql += " WHERE status = ?"
+                clauses.append("status = ?")
                 params.append(status)
+            if owner_user_id is not None:
+                clauses.append("owner_user_id = ?")
+                params.append(int(owner_user_id))
+            if clauses:
+                sql += " WHERE " + " AND ".join(clauses)
             sql += " ORDER BY id DESC"
             rows = conn.execute(sql, params).fetchall()
             return [
@@ -736,6 +829,22 @@ def get_fallback_sos(status: Optional[str] = None) -> List[dict]:
         return []
 
 
+def get_fallback_sos_by_id(sos_id: int) -> Optional[dict]:
+    try:
+        with _get_connection() as conn:
+            r = conn.execute("SELECT * FROM fallback_sos WHERE id = ?", (sos_id,)).fetchone()
+            if not r:
+                return None
+            d = dict(r)
+            d["has_elderly_or_children"] = bool(d["has_elderly_or_children"])
+            d["location_confirmed"] = bool(d.get("location_confirmed"))
+            d["signature_verified"] = bool(d.get("signature_verified"))
+            return d
+    except Exception as e:
+        log.warning("Lỗi get_fallback_sos_by_id: %s", e)
+        return None
+
+
 def save_fallback_sos(data: dict) -> dict:
     now_iso = datetime.now(timezone.utc).isoformat()
     lng_val = float(data["lng"]) if data.get("lng") is not None else None
@@ -743,6 +852,7 @@ def save_fallback_sos(data: dict) -> dict:
     acc_val = float(data["location_accuracy_m"]) if data.get("location_accuracy_m") is not None else None
     client_event_id = data.get("client_event_id")
     payload_hash = data.get("payload_hash")
+    owner_user_id = int(data["owner_user_id"]) if data.get("owner_user_id") is not None else None
 
     with _FALLBACK_WRITE_LOCK:
         try:
@@ -786,13 +896,13 @@ def save_fallback_sos(data: dict) -> dict:
                         location_source, location_accuracy_m, location_captured_at,
                         location_confirmed, location_description, location_landmark,
                         people_count, has_elderly_or_children, water_level_cm,
-                        priority, status, notes, created_at, updated_at,
+                        priority, status, notes, owner_user_id, created_at, updated_at,
                         client_event_id, payload_hash,
                         tracking_token_hash, tracking_token_expires_at, tracking_token_revoked,
                         ingest_channel, hop_count, signature_verified,
                         origin_created_at, relayed_at, relay_hops_json
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     data["contact_name"], data["phone"], lng_val, lat_val,
                     data.get("location_source", "manual"), acc_val, data.get("location_captured_at"),
@@ -800,7 +910,7 @@ def save_fallback_sos(data: dict) -> dict:
                     data.get("location_description"), data.get("location_landmark"),
                     int(data.get("people_count", 1)), 1 if data.get("has_elderly_or_children") else 0,
                     float(data.get("water_level_cm", 0.0)), data.get("priority", "high"),
-                    data.get("status", "pending"), data.get("notes"), now_iso, now_iso,
+                    data.get("status", "pending"), data.get("notes"), owner_user_id, now_iso, now_iso,
                     client_event_id, payload_hash,
                     data.get("tracking_token_hash"), data.get("tracking_token_expires_at"),
                     1 if data.get("tracking_token_revoked") else 0,
@@ -816,6 +926,7 @@ def save_fallback_sos(data: dict) -> dict:
                 res["id"] = cursor.lastrowid
                 res["lng"] = lng_val
                 res["lat"] = lat_val
+                res["owner_user_id"] = owner_user_id
                 res["status"] = data.get("status", "pending")
                 res["created_at"] = now_iso
                 res["updated_at"] = now_iso
@@ -890,6 +1001,23 @@ def update_fallback_sos_status(sos_id: int, new_status: str) -> Optional[dict]:
     try:
         with _get_connection() as conn:
             conn.execute("UPDATE fallback_sos SET status = ?, updated_at = ? WHERE id = ?", (new_status, now_iso, sos_id))
+            relief_status = "rescued" if new_status == "rescued" else (
+                "on_scene" if new_status == "on_scene" else (
+                    "dispatched" if new_status == "dispatched" else (
+                        "awaiting_dispatch" if new_status in ("verified", "acknowledged", "pending") else new_status
+                    )
+                )
+            )
+            req_id = f"SOS-{sos_id}"
+            conn.execute(
+                "UPDATE fallback_relief_requests SET status = ?, updated_at = ? WHERE id = ?",
+                (relief_status, now_iso, req_id)
+            )
+            if new_status == "verified":
+                conn.execute(
+                    "UPDATE fallback_relief_requests SET verification_status = 'content_verified', requires_human_review = 0 WHERE id = ?",
+                    (req_id,)
+                )
             conn.commit()
             row = conn.execute("SELECT * FROM fallback_sos WHERE id = ?", (sos_id,)).fetchone()
             if row:
@@ -899,4 +1027,278 @@ def update_fallback_sos_status(sos_id: int, new_status: str) -> Optional[dict]:
     except Exception as e:
         log.warning("Lỗi update_fallback_sos_status: %s", e)
     return None
+
+
+# ==============================================================================
+# HÀM QUẢN LÝ YÊU CẦU CỨU TRỢ & HÀNG CHỜ ĐIỀU PHỐI (RELIEF TRIAGE QUEUE)
+# ==============================================================================
+
+import json
+
+
+def save_fallback_relief_request(triage_data: dict) -> dict:
+    """Lưu trữ kết quả phân loại yêu cầu cứu trợ vào SQLite bền vững."""
+    req_id = triage_data.get("request_id")
+    now_iso = datetime.now(timezone.utc).isoformat()
+    extracted = triage_data.get("extracted", {})
+    verification = triage_data.get("verification", {})
+
+    vulnerable_json = json.dumps(extracted.get("vulnerable_people", []), ensure_ascii=False)
+    needs_json = json.dumps(extracted.get("relief_needs", []), ensure_ascii=False)
+    reasons_json = json.dumps(triage_data.get("priority_reasons", []), ensure_ascii=False)
+    guardrails_json = json.dumps(triage_data.get("guardrails_applied", []), ensure_ascii=False)
+    full_json = json.dumps(triage_data, ensure_ascii=False)
+
+    try:
+        with _get_connection() as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO fallback_relief_requests (
+                    id, contact_name, phone, lng, lat, location_text,
+                    people_count, water_level_m, water_trend, vulnerable_people,
+                    medical_emergency, immediate_danger, mobility_status, relief_needs,
+                    raw_ai_priority, final_priority, priority_reasons, guardrails_applied,
+                    was_downgrade_prevented, verification_status, requires_human_review,
+                    status, full_triage_json, created_at, updated_at
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?, ?,
+                    ?, ?, ?, ?
+                )
+            """, (
+                req_id,
+                extracted.get("contact_name"),
+                extracted.get("contact_phone"),
+                float(extracted["lng"]) if extracted.get("lng") is not None else None,
+                float(extracted["lat"]) if extracted.get("lat") is not None else None,
+                extracted.get("location_text"),
+                extracted.get("people_count"),
+                extracted.get("water_level_m"),
+                extracted.get("water_trend", "unknown"),
+                vulnerable_json,
+                1 if extracted.get("medical_emergency") else 0,
+                1 if extracted.get("immediate_danger") else 0,
+                extracted.get("mobility_status", "unknown"),
+                needs_json,
+                extracted.get("raw_ai_priority", "P3"),
+                triage_data.get("final_priority", "P3"),
+                reasons_json,
+                guardrails_json,
+                1 if triage_data.get("was_downgrade_prevented") else 0,
+                verification.get("verification_status", "needs_verification"),
+                1 if triage_data.get("requires_human_review", True) else 0,
+                triage_data.get("status", "awaiting_dispatch"),
+                full_json,
+                triage_data.get("created_at", now_iso),
+                now_iso
+            ))
+
+            # Lưu nhật ký audit
+            for audit in triage_data.get("override_history", []):
+                conn.execute("""
+                    INSERT INTO fallback_relief_audit (request_id, timestamp, actor, action, old_priority, new_priority, reason)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    req_id,
+                    audit.get("timestamp", now_iso),
+                    audit.get("actor", "system"),
+                    audit.get("action", "created"),
+                    audit.get("old_priority"),
+                    audit.get("new_priority"),
+                    audit.get("reason")
+                ))
+
+            conn.commit()
+    except Exception as e:
+        log.warning("Lỗi save_fallback_relief_request: %s", e)
+
+    return triage_data
+
+
+def get_fallback_relief_queue(
+    priority: Optional[str] = None,
+    status: Optional[str] = None,
+    verification_status: Optional[str] = None
+) -> List[dict]:
+    """
+    Truy xuất hàng chờ điều phối cứu trợ:
+    - Sắp xếp theo thứ tự ưu tiên: P1 (Nguy hiểm tức thời) > P2 > P3 > P4
+    - Trong cùng mức ưu tiên: Sắp xếp theo thời gian tiếp nhận tăng dần (FIFO)
+    """
+    try:
+        with _get_connection() as conn:
+            sql = """
+                SELECT id, contact_name, phone, lng, lat, location_text,
+                       people_count, water_level_m, water_trend, vulnerable_people,
+                       medical_emergency, immediate_danger, mobility_status, relief_needs,
+                       raw_ai_priority, final_priority, priority_reasons, guardrails_applied,
+                       was_downgrade_prevented, verification_status, requires_human_review,
+                       status, full_triage_json, created_at, updated_at
+                FROM fallback_relief_requests
+                WHERE 1=1
+            """
+            params = []
+            if priority:
+                sql += " AND final_priority = ?"
+                params.append(priority.upper().strip())
+            if status:
+                sql += " AND status = ?"
+                params.append(status.strip())
+            if verification_status:
+                sql += " AND verification_status = ?"
+                params.append(verification_status.strip())
+
+            # Thứ tự sắp xếp chuẩn quân sự / cứu nạn:
+            # P1 -> P2 -> P3 -> P4, sau đó created_at ASC (tiếp nhận trước xử lý trước)
+            sql += """
+                ORDER BY
+                    CASE final_priority
+                        WHEN 'P1' THEN 1
+                        WHEN 'P2' THEN 2
+                        WHEN 'P3' THEN 3
+                        WHEN 'P4' THEN 4
+                        ELSE 5
+                    END ASC,
+                    created_at ASC
+            """
+
+            rows = conn.execute(sql, params).fetchall()
+            results = []
+            for r in rows:
+                full_json_str = r["full_triage_json"]
+                if full_json_str:
+                    try:
+                        record = json.loads(full_json_str)
+                        # Đảm bảo các giá trị cập nhật mới nhất từ DB
+                        record["final_priority"] = r["final_priority"]
+                        record["status"] = r["status"]
+                        record["verification_status"] = r["verification_status"]
+                        record["updated_at"] = r["updated_at"]
+                        results.append(record)
+                        continue
+                    except Exception:
+                        pass
+
+                # Fallback dựng dict trực tiếp từ columns
+                results.append({
+                    "request_id": r["id"],
+                    "final_priority": r["final_priority"],
+                    "status": r["status"],
+                    "verification_status": r["verification_status"],
+                    "created_at": r["created_at"],
+                    "updated_at": r["updated_at"],
+                    "people_count": r["people_count"],
+                    "water_level_m": r["water_level_m"],
+                    "water_trend": r["water_trend"],
+                    "contact_name": r["contact_name"],
+                    "phone": r["phone"],
+                    "lat": r["lat"],
+                    "lng": r["lng"],
+                    "location_text": r["location_text"],
+                    "priority_reasons": json.loads(r["priority_reasons"] or "[]"),
+                    "vulnerable_people": json.loads(r["vulnerable_people"] or "[]"),
+                    "relief_needs": json.loads(r["relief_needs"] or "[]"),
+                    "medical_emergency": bool(r["medical_emergency"]),
+                    "immediate_danger": bool(r["immediate_danger"]),
+                    "was_downgrade_prevented": bool(r["was_downgrade_prevented"]),
+                    "requires_human_review": bool(r["requires_human_review"]),
+                })
+            return results
+    except Exception as e:
+        log.warning("Lỗi get_fallback_relief_queue: %s", e)
+        return []
+
+
+def get_fallback_relief_request_by_id(request_id: str) -> Optional[dict]:
+    """Lấy chi tiết yêu cầu cứu trợ kèm theo lịch sử nhật ký audit."""
+    try:
+        with _get_connection() as conn:
+            row = conn.execute("SELECT * FROM fallback_relief_requests WHERE id = ?", (request_id,)).fetchone()
+            if not row:
+                return None
+            full_json_str = row["full_triage_json"]
+            record = {}
+            if full_json_str:
+                try:
+                    record = json.loads(full_json_str)
+                except Exception:
+                    pass
+
+            # Lấy toàn bộ audit logs
+            audit_rows = conn.execute(
+                "SELECT timestamp, actor, action, old_priority, new_priority, reason FROM fallback_relief_audit WHERE request_id = ? ORDER BY id ASC",
+                (request_id,)
+            ).fetchall()
+            record["override_history"] = [dict(a) for a in audit_rows]
+            record["final_priority"] = row["final_priority"]
+            record["status"] = row["status"]
+            record["updated_at"] = row["updated_at"]
+            return record
+    except Exception as e:
+        log.warning("Lỗi get_fallback_relief_request_by_id: %s", e)
+        return None
+
+
+def override_fallback_relief_priority(
+    request_id: str,
+    new_priority: str,
+    dispatcher_name: str,
+    reason: str
+) -> Optional[dict]:
+    """
+    Cho phép Người Điều phối (Dispatcher) xác nhận hoặc điều chỉnh mức ưu tiên.
+    Lưu nhật ký truy vết đầy đủ: người thực hiện, thời điểm, mức cũ, mức mới, lý do.
+    """
+    now_iso = datetime.now(timezone.utc).isoformat()
+    new_p = new_priority.upper().strip()
+    if new_p not in ("P1", "P2", "P3", "P4"):
+        raise ValueError(f"Mức ưu tiên không hợp lệ: {new_priority}. Phải là P1, P2, P3 hoặc P4.")
+
+    try:
+        with _get_connection() as conn:
+            row = conn.execute("SELECT final_priority, full_triage_json FROM fallback_relief_requests WHERE id = ?", (request_id,)).fetchone()
+            if not row:
+                return None
+            old_p = row["final_priority"]
+
+            # Cập nhật bảng yêu cầu
+            conn.execute("""
+                UPDATE fallback_relief_requests
+                SET final_priority = ?, updated_at = ?
+                WHERE id = ?
+            """, (new_p, now_iso, request_id))
+
+            # Ghi nhật ký audit
+            conn.execute("""
+                INSERT INTO fallback_relief_audit (request_id, timestamp, actor, action, old_priority, new_priority, reason)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (request_id, now_iso, dispatcher_name, "dispatcher_override", old_p, new_p, reason))
+
+            # Đồng bộ lại full_triage_json
+            full_json_str = row["full_triage_json"]
+            if full_json_str:
+                try:
+                    data = json.loads(full_json_str)
+                    data["final_priority"] = new_p
+                    data["updated_at"] = now_iso
+                    data.setdefault("override_history", []).append({
+                        "timestamp": now_iso,
+                        "actor": dispatcher_name,
+                        "action": "dispatcher_override",
+                        "old_priority": old_p,
+                        "new_priority": new_p,
+                        "reason": reason
+                    })
+                    conn.execute("UPDATE fallback_relief_requests SET full_triage_json = ? WHERE id = ?", (json.dumps(data, ensure_ascii=False), request_id))
+                except Exception:
+                    pass
+
+            conn.commit()
+            return get_fallback_relief_request_by_id(request_id)
+    except Exception as e:
+        log.warning("Lỗi override_fallback_relief_priority: %s", e)
+        return None
+
 

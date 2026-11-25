@@ -1,11 +1,28 @@
+# Copyright 2026 GrassTouchers Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """CRUD điểm ngập (flood_points)."""
 from datetime import datetime, timezone, timedelta
 import logging
 from typing import Optional, Any
 
 import psycopg
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 
+from ..auth import AuthUser, record_audit_event, require_roles
 from .. import config
 from ..db import pool, get_db_connection
 from ..schemas import FloodPointCreate, FloodPointUpdate
@@ -652,8 +669,9 @@ SELECT id, (ARRAY[
 
 
 @router.post("/reset")
-def reset_flood_points():
-    """Khôi phục dữ liệu mực nước của 130 trạm về dữ liệu mẫu chuẩn ban đầu trong CSDL."""
+def reset_flood_points(user: AuthUser = Depends(require_roles("coordinator", "admin"))):
+    """Khôi phục dữ liệu mực nước của các trạm về dữ liệu mẫu chuẩn ban đầu."""
+    record_audit_event("flood_points_reset", "flood_points", "all", "success", None, actor=user)
     try:
         with get_db_connection() as conn:
             conn.execute(SEED_READINGS_SQL)
@@ -676,7 +694,11 @@ def get_flood_point(point_id: int):
 
 @router.post("", status_code=201)
 
-def create_flood_point(body: FloodPointCreate):
+def create_flood_point(
+    body: FloodPointCreate,
+    user: AuthUser = Depends(require_roles("coordinator", "admin")),
+):
+    record_audit_event("flood_point_create", "flood_points", body.sensor_id, "success", body.name, actor=user)
 
     try:
 
@@ -710,7 +732,12 @@ def create_flood_point(body: FloodPointCreate):
 
 @router.put("/{point_id}")
 
-def update_flood_point(point_id: int, body: FloodPointUpdate):
+def update_flood_point(
+    point_id: int,
+    body: FloodPointUpdate,
+    user: AuthUser = Depends(require_roles("coordinator", "admin")),
+):
+    record_audit_event("flood_point_update", "flood_points", str(point_id), "success", None, actor=user)
 
     sets, params = [], []
 
@@ -772,7 +799,11 @@ def update_flood_point(point_id: int, body: FloodPointUpdate):
 
 @router.delete("/{point_id}", status_code=204)
 
-def delete_flood_point(point_id: int):
+def delete_flood_point(
+    point_id: int,
+    user: AuthUser = Depends(require_roles("admin")),
+):
+    record_audit_event("flood_point_delete", "flood_points", str(point_id), "success", None, actor=user)
 
     try:
 

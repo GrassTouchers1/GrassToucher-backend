@@ -1,3 +1,19 @@
+# Copyright 2026 GrassTouchers Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Router Quản lý Điểm Sơ tán & Cứu trợ An toàn (Rescue & Shelter Management).
 Hỗ trợ tìm điểm sơ tán gần nhất, kiểm tra sức chứa (capacity) và tình trạng tiếp nhận.
@@ -5,8 +21,9 @@ Hỗ trợ tìm điểm sơ tán gần nhất, kiểm tra sức chứa (capacity
 import math
 import logging
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from ..auth import AuthUser, record_audit_event, require_roles
 from ..db import get_db_connection
 from ..schemas import ShelterCreate
 from ..fallback_storage import get_fallback_shelters, save_fallback_shelter
@@ -72,8 +89,12 @@ def list_shelters(
 
 
 @router.post("", status_code=201)
-def create_shelter(body: ShelterCreate):
+def create_shelter(
+    body: ShelterCreate,
+    user: AuthUser = Depends(require_roles("coordinator", "admin")),
+):
     """Khai báo điểm sơ tán hoặc trạm cứu trợ mới."""
+    record_audit_event("shelter_created", "shelter", body.name, "success", None, actor=user)
     try:
         with get_db_connection() as conn:
             row = conn.execute("""
@@ -94,10 +115,14 @@ def create_shelter(body: ShelterCreate):
 
 @router.get("/nearest")
 def get_nearest_shelter(
-    lng: float = Query(..., ge=-180, le=180, description="Kinh độ hiện tại"),
+    lng: Optional[float] = Query(None, ge=-180, le=180, description="Kinh độ hiện tại"),
+    lon: Optional[float] = Query(None, ge=-180, le=180, description="Kinh độ hiện tại (alias lon)"),
     lat: float = Query(..., ge=-90, le=90, description="Vĩ độ hiện tại"),
 ):
     """Tìm điểm sơ tán mở cửa còn chỗ tiếp nhận gần nhất với toạ độ người dùng."""
+    target_lng = lng if lng is not None else lon
+    if target_lng is None:
+        raise HTTPException(422, "Vui lòng cung cấp kinh độ (lng hoặc lon)")
     try:
         with get_db_connection() as conn:
             row = conn.execute("""
@@ -108,7 +133,7 @@ def get_nearest_shelter(
                 WHERE status = 'open' AND current_occupancy < capacity
                 ORDER BY dist_m ASC
                 LIMIT 1
-            """, (lng, lat)).fetchone()
+            """, (target_lng, lat)).fetchone()
             if row:
                 feat = _to_feature(row)
                 feat["properties"]["distance_m"] = round(float(row["dist_m"]), 1)
@@ -123,7 +148,7 @@ def get_nearest_shelter(
 
     def calc_dist(s):
         # Tính khoảng cách Euclidean xấp xỉ mét
-        dx = (s["lng"] - lng) * 103000
+        dx = (s["lng"] - target_lng) * 103000
         dy = (s["lat"] - lat) * 111000
         return math.hypot(dx, dy)
 

@@ -1,10 +1,27 @@
+# Copyright 2026 GrassTouchers Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Số đo mực nước (water_readings) – cảm biến gửi lên đây."""
 from datetime import datetime, timezone
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from ..auth import AuthUser, record_audit_event, require_roles
 from ..db import pool, get_db_connection
 from ..schemas import ReadingCreate
 from .flood_points import DEFAULT_FLOOD_POINTS
@@ -18,8 +35,12 @@ router = APIRouter(prefix="/api/readings", tags=["Số đo mực nước"])
 
 
 @router.post("", status_code=201)
-def create_reading(body: ReadingCreate):
-    """Cảm biến (hoặc script giả lập) gửi mực nước. Có thể dùng point_id hoặc sensor_id."""
+def create_reading(
+    body: ReadingCreate,
+    user: AuthUser = Depends(require_roles("coordinator", "admin")),
+):
+    """Cảm biến (hoặc cán bộ) gửi mực nước. Có thể dùng point_id hoặc sensor_id."""
+    record_audit_event("reading_created", "reading", str(body.point_id or body.sensor_id), "success", f"depth={body.depth_cm}", actor=user)
     try:
         with get_db_connection() as conn:
             if body.point_id is not None:
@@ -73,12 +94,15 @@ def create_reading(body: ReadingCreate):
 
 
 @router.post("/batch", status_code=201)
-def create_batch_readings(items: list[ReadingCreate]):
+def create_batch_readings(
+    items: list[ReadingCreate],
+    user: AuthUser = Depends(require_roles("coordinator", "admin")),
+):
     """Gửi hàng loạt số đo mực nước để mô phỏng kịch bản mưa bão nhanh."""
     results = []
     for item in items:
         try:
-            results.append(create_reading(item))
+            results.append(create_reading(item, user=user))
         except Exception:
             continue
     return {"count": len(results), "readings": results}

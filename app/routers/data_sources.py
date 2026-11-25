@@ -1,3 +1,19 @@
+# Copyright 2026 GrassTouchers Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Router cung cấp thông tin pháp lý, danh mục và giấy phép các nguồn Dữ liệu Mở (Open Data Sources) của hệ thống NorthStar."""
 from fastapi import APIRouter
 
@@ -7,7 +23,7 @@ OPEN_DATA_CATALOG = {
     "system": "NorthStar - Vietnam Disaster Intelligence & Multi-Hazard Response Ecosystem",
     "software_license": "Apache-2.0 License (100% Open Source Software)",
     "open_data_compliance": True,
-    "total_sources": 5,
+    "total_sources": 6,
     "sources": [
         {
             "id": "osm",
@@ -32,26 +48,37 @@ OPEN_DATA_CATALOG = {
             "usage_in_northstar": "Vệ tinh radar băng C (SAR) xuyên mây bão 24/7, bóc tách vết ngập bề mặt (Water Inundation Mask) phục vụ xác định bán kính vùng ngập và sạt trượt nguy hiểm."
         },
         {
-            "id": "opendevelopment_mekong",
-            "name": "Open Development Mekong (ODM)",
-            "organization": "Open Development Initiative (ODI)",
-            "url": "https://data.vietnam.opendevelopmentmekong.net",
-            "category": "Dữ liệu sông ngòi, lưu vực nước và môi trường",
+            "id": "openaq",
+            "name": "OpenAQ & Open-Meteo Air Quality Open Data Network",
+            "organization": "OpenAQ Community & Open-Meteo",
+            "url": "https://openaq.org",
+            "category": "Mạng lưới quan trắc chất lượng không khí & bụi mịn mở",
             "license": "Creative Commons Attribution 4.0 International (CC-BY 4.0)",
-            "license_type": "Open Data (Được phép sao chép, phân phối và biến đổi)",
+            "license_type": "Open Data (Tự do khai thác, chia sẻ và tích hợp)",
             "is_open_data": True,
-            "usage_in_northstar": "Cung cấp bản đồ số ranh giới thủy văn, mạng lưới lưu vực sông Hồng - Thái Bình, vị trí các hồ chứa thủy điện (Hòa Bình, Tuyên Quang, Thác Bà) và vùng trũng thấp."
+            "usage_in_northstar": "Cung cấp chỉ số US AQI, nồng độ bụi mịn PM2.5, PM10, khí CO, NO2 thời gian thực của 18 trạm quan trắc trên toàn Miền Bắc, đưa ra cảnh báo hô hấp và khuyến cáo y tế tức thì."
         },
         {
-            "id": "nchmf",
-            "name": "Trung tâm Dự báo Khí tượng Thủy văn Quốc gia (NCHMF)",
-            "organization": "Tổng cục Khí tượng Thủy văn - Bộ Tài nguyên và Môi trường Việt Nam",
-            "url": "https://nchmf.gov.vn",
-            "category": "Thông tin khí tượng, cấp độ rủi ro & báo động lũ",
-            "license": "Dữ liệu công ích (Nghị định 47/2020/NĐ-CP & Luật Tiếp cận thông tin 2016)",
-            "license_type": "Public Sector Information / Open Government Data",
+            "id": "copernicus_glofas",
+            "name": "Copernicus GloFAS (Global Flood Awareness System)",
+            "organization": "European Centre for Medium-Range Weather Forecasts (ECMWF)",
+            "url": "https://www.globalfloods.eu",
+            "category": "Hệ thống cảnh báo sớm và dự báo lưu lượng lũ sông toàn cầu",
+            "license": "Copernicus Open Access Policy (Regulation EU No 377/2014)",
+            "license_type": "Open Satellite & Hydrological Data",
             "is_open_data": True,
-            "usage_in_northstar": "Cung cấp các mốc báo động lũ (Báo động 1, 2, 3) trên các trạm thủy văn Sông Hồng, Sông Thao, Sông Cầu, Sông Thương, Sông Lô, Sông Đáy và các bản tin cảnh báo lũ quét khẩn cấp."
+            "usage_in_northstar": "Cung cấp mốc cảnh báo lũ, lưu lượng xả đáy và lưu lượng dòng chảy các lưu vực sông lớn (Sông Hồng, Sông Thao, Sông Lô) hoàn toàn trên chuẩn mở FOSS/OSI."
+        },
+        {
+            "id": "nasa_gpm",
+            "name": "NASA GPM (Global Precipitation Measurement)",
+            "organization": "NASA Earth Science Data Systems",
+            "url": "https://gpm.nasa.gov",
+            "category": "Dữ liệu vệ tinh đo lượng mưa toàn cầu mở",
+            "license": "NASA Open Data Policy (Free & Open Access)",
+            "license_type": "Public Open Data",
+            "is_open_data": True,
+            "usage_in_northstar": "Cung cấp dữ liệu tích lũy mưa vệ tinh IMERG viễn thám, hỗ trợ kiểm chứng độc lập trường mưa và bổ trợ mô hình dự báo ngập lụt đa nguồn."
         },
         {
             "id": "open_meteo",

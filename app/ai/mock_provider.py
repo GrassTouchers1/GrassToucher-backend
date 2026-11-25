@@ -1,3 +1,19 @@
+# Copyright 2026 GrassTouchers Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Mock AI Provider (Ngoại tuyến / Rule-based Fallback).
 Cung cấp khả năng xử lý NLP hoàn toàn ngoại tuyến cho hệ thống NorthStar.
@@ -300,17 +316,15 @@ class MockAIProvider(AIProvider):
             except Exception:
                 quantity = 3
 
-        # 1 can gạo tiêu chuẩn ở nông thôn/miền Bắc là can 5L (~4.2 kg gạo)
         est_kg = quantity * 4.2 if "can" in msg or "thùng" in msg else (quantity * 10 if "bao" in msg else quantity)
         if "gói" in msg:
             est_days_1p = max(1, quantity // 2)
             est_days_family = max(1, quantity // 6)
         else:
-            # 1 người lớn sinh tồn tối thiểu cần ~250g - 300g gạo/ngày (nấu cháo loãng ~900-1100 kcal)
             est_days_1p = int(est_kg / 0.25)
-            est_days_family = int(est_kg / 0.9)  # Gia đình 3 - 4 người
+            est_days_family = int(est_kg / 0.9)
 
-        res = (
+        return (
             f"🌾 **TÍNH TOÁN KHẨU PHẦN SINH TỒN ({quantity} {unit}):**\n"
             f"- Khối lượng ước tính: **~{int(est_kg) if 'gói' not in msg else quantity} {'kg gạo' if 'gói' not in msg else 'gói mì'}**.\n"
             f"- Nếu **1 người**: Có thể duy trì cầm cự được khoảng **{est_days_1p} ngày** (nấu cháo loãng chia 2 bữa/ngày).\n"
@@ -320,7 +334,6 @@ class MockAIProvider(AIProvider):
             f"2. **Bảo quản khô ráo:** Kê cao các can gạo lên gác xép hoặc trần nhà, tuyệt đối không để nước ngập làm hỏng, mốc.\n"
             f"3. **QUY TẮC SỐNG CÒN:** **Đừng đợi đến khi hết sạch gạo mới kêu cứu!** Hãy phát tín hiệu cứu hộ SOS ngay từ hôm nay để Ban Chỉ huy đưa gia đình vào danh sách tiếp tế sớm."
         )
-        return res
 
     async def chat(
         self,
@@ -338,7 +351,6 @@ class MockAIProvider(AIProvider):
         live_pts = context.get("flood_points", []) if context else []
         shelters = context.get("shelters", []) if context else []
 
-        # 1. Yêu cầu cứu hộ SOS / Mắc kẹt nguy cấp (Ưu tiên cao nhất)
         if any(k in msg for k in ["sos", "cứu", "khẩn cấp", "mắc kẹt", "chìm", "giúp", "kêu cứu", "nguy cấp", "đường dây nóng", "114", "112", "nóc nhà", "gác xép", "tràn vào nhà", "ngang cổ", "ngang ngực"]):
             reply = (
                 "🆘 **HỖ TRỢ CỨU HỘ & ỨNG PHÓ KHẨN CẤP 24/7:**\n"
@@ -348,7 +360,6 @@ class MockAIProvider(AIProvider):
             )
             actions.append(SuggestedAction(label="🆘 Gửi tín hiệu SOS khẩn cấp", action="open_sos"))
 
-        # 2. Y tế & Sơ cứu ban đầu (Rắn cắn, thương tích, ngộ độc)
         elif any(k in msg for k in ["thuốc", "y tế", "sơ cứu", "bị thương", "chảy máu", "rắn", "sốt", "đau bụng", "tiêu chảy", "bệnh"]):
             reply = (
                 "🏥 **HƯỚNG DẪN Y TẾ & SƠ CỨU TRONG VÙNG NGẬP LỤT:**\n"
@@ -358,7 +369,6 @@ class MockAIProvider(AIProvider):
             )
             actions.append(SuggestedAction(label="🆘 Yêu cầu hỗ trợ y tế khẩn cấp", action="open_sos"))
 
-        # 3. Đối tượng ưu tiên đặc biệt: Người già, Trẻ em, Bà bầu
         elif any(k in msg for k in ["trẻ em", "trẻ nhỏ", "sơ sinh", "bà bầu", "mang thai", "người già", "tai biến", "người bệnh", "ốm"]):
             reply = (
                 "🚨 **HỖ TRỢ ĐỐI TƯỢNG ƯU TIÊN DI TẢN CẤP 1:**\n"
@@ -368,12 +378,10 @@ class MockAIProvider(AIProvider):
             )
             actions.append(SuggestedAction(label="🆘 Ưu tiên cứu hộ khẩn cấp", action="open_sos"))
 
-        # 4A. Câu hỏi cụ thể về Lương thực / Gạo / Mì tôm / Thời gian cầm cự theo số lượng
         elif any(k in msg for k in ["gạo", "mì tôm", "mỳ tôm", "lương thực", "can gạo", "bao gạo", "gói mì", "thức ăn", "thực phẩm", "nhịn ăn", "đói", "cầm cự"]):
             reply = self._estimate_food_survival(msg)
             actions.append(SuggestedAction(label="🆘 Gửi tín hiệu cần tiếp tế lương thực", action="open_sos"))
 
-        # 4B. Cẩm nang sinh tồn tổng quát: Cần làm gì để sống / Kỹ năng sống còn khi bị cô lập
         elif any(k in msg for k in [
             "để sống", "làm gì để sống", "cần làm gì để sống", "làm sao để sống",
             "cách sinh tồn", "kỹ năng sinh tồn", "kỹ năng sống", "bí quyết sinh tồn",
@@ -384,7 +392,6 @@ class MockAIProvider(AIProvider):
             actions.append(SuggestedAction(label="🆘 Gửi tín hiệu SOS khẩn cấp", action="open_sos"))
             actions.append(SuggestedAction(label="🛡️ Xem trạm sơ tán gần nhất", action="switch_tab", tab="evac"))
 
-        # 4C. Chuẩn bị trước thiên tai & Túi đồ cứu sinh khẩn cấp (Go-Bag)
         elif any(k in msg for k in [
             "chuẩn bị gì", "cần mang gì", "mang theo gì", "túi cứu sinh", "ba lô cứu sinh",
             "go bag", "dự trữ gì", "vật dụng cần thiết", "đồ đạc cần mang", "túi khẩn cấp", "sơ tán mang gì"
@@ -393,7 +400,6 @@ class MockAIProvider(AIProvider):
             actions.append(SuggestedAction(label="🛡️ Xem trạm sơ tán an toàn", action="switch_tab", tab="evac"))
             actions.append(SuggestedAction(label="🧭 Mở Tìm đường Né ngập", action="switch_tab", tab="route"))
 
-        # 4D. Tín hiệu phát cầu cứu ban ngày & ban đêm cho đội cứu hộ
         elif any(k in msg for k in [
             "tín hiệu", "báo hiệu", "kêu cứu ban đêm", "cho cứu hộ thấy", "ra hiệu",
             "còi cứu hộ", "cầu cứu ban đêm", "đèn pin báo hiệu"
@@ -401,7 +407,6 @@ class MockAIProvider(AIProvider):
             reply = self._rescue_signaling_guide()
             actions.append(SuggestedAction(label="🆘 Phát tín hiệu SOS khẩn cấp", action="open_sos"))
 
-        # 4E. Vệ sinh sau lũ, phòng ngừa dịch bệnh & nước ăn chân
         elif any(k in msg for k in [
             "nước ăn chân", "dịch bệnh", "ghẻ lở", "ô nhiễm", "khử trùng môi trường",
             "vệ sinh sau lũ", "dọn bùn", "rác thải", "khử trùng giếng"
@@ -409,7 +414,6 @@ class MockAIProvider(AIProvider):
             reply = self._post_flood_health_guide()
             actions.append(SuggestedAction(label="🏥 Yêu cầu hỗ trợ y tế", action="open_sos"))
 
-        # 5. Câu hỏi về An toàn điện khi ngập
         elif "điện" in msg or "giật" in msg or "cầu dao" in msg or "aptomat" in msg:
             reply = (
                 "⚡ **HƯỚNG DẪN AN TOÀN ĐIỆN KHI NGẬP NƯỚC (Bộ Công Thương & PCTT):**\n"
@@ -419,7 +423,6 @@ class MockAIProvider(AIProvider):
             )
             actions.append(SuggestedAction(label="🆘 Báo cứu nạn SOS", action="open_sos"))
 
-        # 6. Kỹ năng thoát hiểm Lũ quét & Sạt lở đất
         elif "lũ quét" in msg or "sạt lở" in msg or "núi" in msg:
             reply = (
                 "🌊 **KỸ NĂNG SINH TỒN KHI CÓ NGUY CƠ LŨ QUÉT & SẠT LỞ ĐẤT:**\n"
@@ -427,9 +430,8 @@ class MockAIProvider(AIProvider):
                 "2. Tránh xa các vách taluy đất dựng đứng đã no nước mưa nhiều ngày.\n"
                 "3. Di chuyển ngay vào các điểm sơ tán kiên cố đã được định vị an toàn."
             )
-            actions.append(SuggestedAction(label="🛡️ Xem trạm sơ tán gần nhất", action="switch_tab", tab="rescue"))
+            actions.append(SuggestedAction(label="🛡️ Xem trạm sơ tán gần nhất", action="switch_tab", tab="evac"))
 
-        # 7. Hướng dẫn Lọc nước sinh tồn & Nước uống
         elif any(k in msg for k in ["nước uống", "nước sạch", "lọc nước", "khát", "khử trùng nước", "uống nước", "nước ăn", "nước sinh hoạt", "cloramin", "phèn chua"]):
             reply = (
                 "💧 **HƯỚNG DẪN XỬ LÝ & LỌC NƯỚC UỐNG SINH TỒN (Bộ Y tế & PCTT):**\n"
@@ -440,9 +442,7 @@ class MockAIProvider(AIProvider):
             )
             actions.append(SuggestedAction(label="🆘 Gửi tín hiệu cần cứu trợ", action="open_sos"))
 
-        # 9. Tra cứu điểm ngập và điều tiết phương tiện
         elif any(k in msg for k in ["đường nào", "ngập không", "đi được không", "xe máy", "ô tô", "lộ trình", "tuyến", "cầu giấy", "láng hạ", "thái hà", "hà đông", "hoài đức", "xuân thủy", "mỹ đình", "phạm hùng", "nguyễn trãi", "đống đa", "ba đình", "hoàn kiếm", "ngập", "nước sâu"]):
-            # Tìm kiếm điểm ngập thực tế khớp với câu hỏi
             matched_pts = []
             keywords = ["cầu giấy", "láng hạ", "thái hà", "hà đông", "hoài đức", "xuân thủy", "mỹ đình", "phạm hùng", "nguyễn trãi", "đống đa", "ba đình", "hoàn kiếm", "tây hồ", "thanh xuân", "từ liêm", "đại lộ thăng long", "quốc oai"]
             for p in live_pts:
@@ -473,7 +473,6 @@ class MockAIProvider(AIProvider):
                 )
                 actions.append(SuggestedAction(label="🧭 Mở Tìm đường Né ngập", action="switch_tab", tab="route"))
 
-        # 10. Cảnh báo các tỉnh miền Bắc
         elif any(prov in msg for prov in ["thái nguyên", "lào cai", "yên bái", "hà nội", "phú thọ", "phong châu", "bảo yên", "làng nủ"]):
             lines = []
             if "lào cai" in msg or "làng nủ" in msg or "bảo yên" in msg:
@@ -484,7 +483,7 @@ class MockAIProvider(AIProvider):
                 lines.append("- **Thái Nguyên (Sông Cầu):** Trạm Gia Bảy ghi nhận nước dâng 48cm. 3 trạm sơ tán đã mở cửa đón nhân dân tại Sân vận động và THPT Chuyên.")
             if "phú thọ" in msg or "phong châu" in msg:
                 lines.append("- **Phú Thọ (Cầu Phong Châu):** Sự cố sập nhịp cầu Phong Châu, cấm mọi phương tiện qua lại, phân luồng sang cầu Ngọc Tháp và cầu Trung Hà.")
-            
+
             if lines:
                 reply = "🛰️ **CẢNH BÁO THỜI GIAN THỰC VÙNG MIỀN BẮC:**\n" + "\n".join(lines)
             else:
@@ -494,9 +493,8 @@ class MockAIProvider(AIProvider):
                     f"- Hệ thống có {len(shelters)} điểm sơ tán mở cửa tiếp nhận nhân dân và {len(live_pts)} trạm quan trắc tự động.\n"
                     f"- Vui lòng kích hoạt chế độ **Bản đồ Vệ tinh / Lũ lụt** để quan sát vùng rủi ro."
                 )
-            actions.append(SuggestedAction(label="🗺️ Xem Bản đồ Toàn cảnh", action="switch_tab", tab="weather"))
+            actions.append(SuggestedAction(label="🗺️ Xem Bản đồ Toàn cảnh", action="switch_tab", tab="overview"))
 
-        # 11. Trả lời thông minh tổng quát (Fallback khi không rõ chủ đề)
         else:
             reply = (
                 f"🤖 **Trợ lý AI Trực ban Thiên tai NorthStar (Ngoại tuyến):**\n"
@@ -506,9 +504,8 @@ class MockAIProvider(AIProvider):
                 f"• 🌾 **Ước tính lương thực:** Nhập số can gạo, thùng mì tôm để tính số ngày cầm cự và cách chia khẩu phần.\n"
                 f"• 💧 **Xử lý nước sạch & an toàn điện:** Hướng dẫn lọc nước lũ, an toàn điện khi nước tràn vào nhà.\n"
                 f"• 🏥 **Y tế & Sơ cứu:** Xử lý rắn cắn, tiêu chảy, vết thương hở trong bão lũ, phòng nước ăn chân.\n"
-                f"• 🛣️ **Tra cứu ngập lụt:** Kiểm tra tình trạng ngập cho bất kỳ tuyến đường nào (Cầu Giấy, Láng Hạ, Hà Đông, Hoài Đức...).\n"
-                f"• 🆘 **Cứu nạn khẩn cấp:** Kết nối đường dây nóng 114, 112 và chuyển phát tọa độ GPS về Ban Chỉ huy.\n\n"
-                f"💡 *Mẹo mở khóa trò chuyện tự do:* Cấu hình `GROQ_API_KEY` trong tệp `.env` để kích hoạt siêu AI LLaMA 3.3 70B trả lời mọi chủ đề bằng ngôn ngữ tự nhiên."
+                f"• 🛣️ **Tra cứu ngập lụt:** Kiểm tra tình trạng ngập cho bất kỳ tuyến đường nào.\n"
+                f"• 🆘 **Cứu nạn khẩn cấp:** Kết nối đường dây nóng 114, 112 và truyền tọa độ GPS về Ban Chỉ huy."
             )
             actions.append(SuggestedAction(label="🧭 Mở Tìm đường Né ngập", action="switch_tab", tab="route"))
             actions.append(SuggestedAction(label="🆘 Phát tín hiệu SOS khẩn cấp", action="open_sos"))
@@ -517,6 +514,197 @@ class MockAIProvider(AIProvider):
             reply=reply,
             suggested_actions=actions,
             sources_consulted=sources,
+            provider_used="mock_offline",
+            is_fallback=True
+        )
+
+    async def triage_relief_request(self, request, existing_requests=None):
+        """Phân loại yêu cầu cứu trợ bằng Rule Engine hoàn toàn ngoại tuyến."""
+        from .verification import ReliefVerificationEngine
+        from .guardrails import ReliefGuardrailsEngine
+        from .schemas import ReliefExtractedData, ReliefTriageResult, ReliefAuditEntry
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        req_id = request.request_id or f"NS-{int(datetime.now().timestamp() * 1000) % 1000000:06d}"
+        text = (request.message or "").lower()
+
+        missing = []
+        conflicts = []
+        reasons = []
+
+        people_count = None
+        p_match = re.search(r"(\d+)\s*(người|nhân khẩu|ng|bác|cháu|thành viên)", text)
+        if p_match:
+            people_count = int(p_match.group(1))
+        elif "gia đình" in text:
+            people_count = 4
+
+        # 2. Trích xuất mực nước
+        water_level_m = None
+        w_match = re.search(r"(\d+(?:\.\d+)?)\s*(m|mét|met|cm)", text)
+        if w_match:
+            val = float(w_match.group(1))
+            unit = w_match.group(2)
+            water_level_m = val / 100.0 if unit == "cm" else val
+        elif "nóc nhà" in text or "mái tôn" in text or "ngập tầng 2" in text:
+            water_level_m = 2.0
+            reasons.append("Người dân báo ngập đến nóc/tầng 2")
+        elif "ngang ngực" in text or "ngang người" in text:
+            water_level_m = 1.3
+        elif "đầu gối" in text or "ngang bắp chân" in text:
+            water_level_m = 0.4
+
+        # 3. Xu hướng nước
+        water_trend = "unknown"
+        if any(k in text for k in ["nước đang lên", "nước dâng", "dâng nhanh", "cuồn cuộn", "chảy xiết", "tràn vào"]):
+            water_trend = "rising"
+            reasons.append("Nước đang dâng nhanh")
+        elif any(k in text for k in ["rút dần", "đang rút", "rút bớt"]):
+            water_trend = "receding"
+        elif "ổn định" in text or "chững lại" in text:
+            water_trend = "stable"
+
+        # 4. Người dễ bị tổn thương
+        vulnerable = []
+        if any(k in text for k in ["cụ già", "người già", "bà già", "ông lão", "bà lão", "tai biến", "liệt"]):
+            vulnerable.append("elderly")
+        if any(k in text for k in ["trẻ nhỏ", "trẻ em", "em bé", "cháu nhỏ", "cháu bé", "trẻ con", "sơ sinh", "con nhỏ", "cháu"]):
+            vulnerable.append("children")
+        if any(k in text for k in ["mang bầu", "mang thai", "bầu bí", "sắp sinh"]):
+            vulnerable.append("pregnant")
+        if any(k in text for k in ["khuyết tật", "liệt giường", "chân đau không đi được"]):
+            vulnerable.append("disabled")
+
+        # 5. Khả năng tự thoát hiểm & Nguy hiểm tức thời
+        mobility_status = "unknown"
+        if any(k in text for k in ["trên mái", "nóc nhà", "mái tôn", "leo lên tum"]):
+            mobility_status = "trapped_roof"
+            reasons.append("Đang mắc kẹt trên mái nhà")
+        elif any(k in text for k in ["cô lập", "chia cắt", "không ra được", "mắc kẹt trong nhà"]):
+            mobility_status = "isolated"
+
+        # 6. Cấp cứu y tế & Nguy hiểm tức thời
+        medical_emergency = False
+        if any(k in text for k in ["cấp cứu", "mất máu", "chấn thương", "sốt cao", "co giật", "khó thở", "bệnh nhân", "thuốc trợ tim"]):
+            medical_emergency = True
+            reasons.append("Báo cáo có người cần trợ giúp y tế khẩn cấp")
+
+        immediate_danger = False
+        if mobility_status == "trapped_roof" or any(k in text for k in ["sắp sập", "sập nhà", "cuốn trôi", "chới với", "nguy kịch", "cứu gấp", "chết đuối", "chìm"]):
+            immediate_danger = True
+            reasons.append("Tình trạng đe dọa trực tiếp tính mạng")
+
+        mobility_status = "unknown"
+        if any(k in text for k in ["trên mái", "nóc nhà", "mái tôn", "leo lên tum"]):
+            mobility_status = "trapped_roof"
+            reasons.append("Đang mắc kẹt trên mái nhà")
+        elif any(k in text for k in ["cô lập", "chia cắt", "không ra được", "mắc kẹt trong nhà"]):
+            mobility_status = "isolated"
+
+        needs = []
+        if any(k in text for k in ["xuồng", "thuyền", "ca nô", "di tản", "sơ tán"]):
+            needs.append("boat_evacuation")
+        if any(k in text for k in ["lương thực", "nước uống", "đói", "sữa", "mì tôm", "cơm"]):
+            needs.append("food_water")
+        if any(k in text for k in ["phao", "áo phao"]):
+            needs.append("lifejacket")
+        if medical_emergency:
+            needs.append("medical_kit")
+
+        raw_priority = "P3"
+        if immediate_danger or medical_emergency or mobility_status == "trapped_roof" or (water_trend == "rising" and water_level_m and water_level_m >= 1.0):
+            raw_priority = "P1"
+        elif len(vulnerable) > 0 or water_trend == "rising" or (water_level_m and water_level_m >= 0.6) or mobility_status == "isolated":
+            raw_priority = "P2"
+        elif not needs:
+            raw_priority = "P4"
+
+        if not request.location_text and request.lat is None:
+            missing.append("vị trí / tọa độ")
+        if people_count is None:
+            missing.append("số lượng người cụ thể")
+        if water_level_m is None:
+            missing.append("mực nước ngập đo lường")
+
+        extracted = ReliefExtractedData(
+            request_id=req_id,
+            location_text=request.location_text,
+            lat=request.lat,
+            lng=request.lng,
+            people_count=people_count,
+            water_level_m=water_level_m,
+            water_trend=water_trend,
+            vulnerable_people=vulnerable,
+            medical_emergency=medical_emergency,
+            immediate_danger=immediate_danger,
+            mobility_status=mobility_status,
+            relief_needs=needs,
+            contact_name=request.contact_name,
+            contact_phone=request.phone,
+            citizen_reported_facts={"raw_message": request.message},
+            ai_inferred_facts={"rule_derived": True},
+            raw_ai_priority=raw_priority,
+            ai_priority_reasons=reasons,
+            missing_information=missing,
+            conflicting_information=conflicts
+        )
+
+        verification = ReliefVerificationEngine.verify_request(
+            extracted=extracted,
+            source=request.source,
+            existing_requests=existing_requests
+        )
+
+        (
+            final_priority,
+            priority_reasons,
+            guardrails_applied,
+            was_downgrade_prevented,
+            requires_human_review
+        ) = ReliefGuardrailsEngine.evaluate_priority(
+            extracted=extracted,
+            verification=verification
+        )
+
+        audit_history = [
+            ReliefAuditEntry(
+                timestamp=now_iso,
+                actor="mock_rule_engine",
+                action="created",
+                new_priority=raw_priority,
+                reason="Rule Engine trích xuất ngoại tuyến"
+            )
+        ]
+        if was_downgrade_prevented:
+            audit_history.append(
+                ReliefAuditEntry(
+                    timestamp=now_iso,
+                    actor="business_guardrails",
+                    action="rule_override",
+                    old_priority=raw_priority,
+                    new_priority=final_priority,
+                    reason=f"Kích hoạt bảo vệ: {', '.join(guardrails_applied)}"
+                )
+            )
+
+        status = "awaiting_dispatch"
+        if verification.verification_status == "needs_verification" and final_priority in ("P3", "P4"):
+            status = "needs_verification"
+
+        return ReliefTriageResult(
+            request_id=req_id,
+            extracted=extracted,
+            verification=verification,
+            final_priority=final_priority,
+            priority_reasons=priority_reasons,
+            guardrails_applied=guardrails_applied,
+            was_downgrade_prevented=was_downgrade_prevented,
+            requires_human_review=requires_human_review,
+            confidence_score=0.88,
+            status=status,
+            created_at=now_iso,
+            updated_at=now_iso,
+            override_history=audit_history,
             provider_used="mock_offline",
             is_fallback=True
         )

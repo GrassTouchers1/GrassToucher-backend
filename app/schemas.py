@@ -1,3 +1,19 @@
+# Copyright 2026 GrassTouchers Team
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 """Các mô hình dữ liệu (validate đầu vào cho API)."""
 from typing import Literal, Optional
 
@@ -56,8 +72,31 @@ class ReportClear(BaseModel):
 
 
 class LngLat(BaseModel):
-    lng: float = Field(ge=-180, le=180)
+    lng: Optional[float] = Field(default=None, ge=-180, le=180)
     lat: float = Field(ge=-90, le=90)
+    lon: Optional[float] = Field(default=None, ge=-180, le=180)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_coords(cls, data):
+        if isinstance(data, (list, tuple)) and len(data) >= 2:
+            return {"lng": float(data[0]), "lat": float(data[1]), "lon": float(data[0])}
+        if isinstance(data, dict):
+            if "lng" not in data and "lon" in data:
+                data["lng"] = data["lon"]
+            elif "lon" not in data and "lng" in data:
+                data["lon"] = data["lng"]
+            if data.get("lng") is None and data.get("lon") is not None:
+                data["lng"] = data["lon"]
+        return data
+
+    @model_validator(mode="after")
+    def ensure_lng(self):
+        if self.lng is None and self.lon is not None:
+            self.lng = self.lon
+        if self.lng is None:
+            raise ValueError("Cần cung cấp kinh độ (lng hoặc lon)")
+        return self
 
 
 class RouteRequest(BaseModel):
@@ -126,7 +165,7 @@ class SOSCreate(BaseModel):
 
 
 class SOSStatusUpdate(BaseModel):
-    status: Literal["pending", "acknowledged", "dispatched", "rescued", "cancelled"]
+    status: Literal["pending", "verified", "acknowledged", "dispatched", "on_scene", "rescued", "cancelled"]
 
 
 class EvacuationRouteRequest(BaseModel):
