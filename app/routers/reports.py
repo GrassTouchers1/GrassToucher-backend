@@ -1,11 +1,15 @@
 """Báo cáo ngập của người dân (crowdsourcing) + logic xác nhận."""
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
 import logging
+import psycopg
 from fastapi import APIRouter, HTTPException, Response
 
 from ..db import pool, get_db_connection
 from ..schemas import ReportClear, ReportCreate
 from ..fallback_storage import (
+    IdempotencyConflictError,
     save_fallback_report,
     get_fallback_reports,
     clear_fallback_reports,
@@ -14,6 +18,18 @@ from ..fallback_storage import (
 
 log = logging.getLogger("floodnav.reports")
 router = APIRouter(prefix="/api/reports", tags=["Báo cáo của người dân"])
+
+
+def compute_report_payload_hash(body: ReportCreate) -> str:
+    canonical = {
+        "lng": body.lng,
+        "lat": body.lat,
+        "level": body.level,
+        "user_id": body.user_id,
+        "photo_url": body.photo_url,
+    }
+    raw = json.dumps(canonical, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 # --- Tham số quy tắc xác nhận ---
 CONFIRM_RADIUS_M = 100       # bán kính gom các báo cáo gần nhau
@@ -33,14 +49,37 @@ POINT = "ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography"
 
 @router.post("", status_code=201)
 def create_report(body: ReportCreate):
+    payload_hash = compute_report_payload_hash(body) if body.client_event_id else None
     try:
         with get_db_connection() as conn:
-            rep = conn.execute(
-                """INSERT INTO reports (user_id, geom, level, photo_url)
-                   VALUES (%s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), %s::report_level, %s)
-                   RETURNING id, created_at, expires_at""",
-                (body.user_id, body.lng, body.lat, body.level, body.photo_url),
-            ).fetchone()
+            try:
+                rep = conn.execute(
+                    """INSERT INTO reports (user_id, geom, level, photo_url, client_event_id, payload_hash)
+                       VALUES (%s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), %s::report_level, %s, %s, %s)
+                       RETURNING id, created_at, expires_at""",
+                    (body.user_id, body.lng, body.lat, body.level, body.photo_url, body.client_event_id, payload_hash),
+                ).fetchone()
+            except psycopg.errors.UniqueViolation:
+                conn.rollback()
+                existing = conn.execute(
+                    "SELECT id, level, confirmed, expires_at, payload_hash FROM reports WHERE client_event_id = %s",
+                    (body.client_event_id,),
+                ).fetchone()
+                if existing:
+                    if existing.get("payload_hash") and payload_hash and existing["payload_hash"] != payload_hash:
+                        log.warning("Idempotency conflict on Report client_event_id=%s", body.client_event_id)
+                        raise HTTPException(409, "Xung đột dữ liệu: client_event_id báo ngập đã tồn tại với nội dung khác.")
+                    return {
+                        "id": existing["id"],
+                        "level": existing["level"],
+                        "confirmed": bool(existing["confirmed"]),
+                        "nearby_reports": 1,
+                        "need_more": 0,
+                        "expires_at": existing["expires_at"],
+                        "client_event_id": body.client_event_id,
+                        "idempotent_replay": True,
+                    }
+                raise
 
             # 1) Các báo cáo còn hiệu lực, gần nhau (kể cả báo cáo vừa gửi)
             nearby = conn.execute(
@@ -91,16 +130,26 @@ def create_report(body: ReportCreate):
             "nearby_reports": len(nearby_ids),
             "need_more": 0 if confirmed else CONFIRM_MIN_REPORTS - len(nearby_ids),
             "expires_at": rep["expires_at"],
+            "client_event_id": body.client_event_id,
+            "idempotent_replay": False,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         log.warning("DB query failed in create_report, using persistent fallback: %s", e)
-        return save_fallback_report(
-            user_id=body.user_id,
-            lng=body.lng,
-            lat=body.lat,
-            level=body.level,
-            photo_url=body.photo_url,
-        )
+        try:
+            return save_fallback_report(
+                user_id=body.user_id,
+                lng=body.lng,
+                lat=body.lat,
+                level=body.level,
+                photo_url=body.photo_url,
+                client_event_id=body.client_event_id,
+                payload_hash=payload_hash,
+            )
+        except IdempotencyConflictError:
+            log.warning("Idempotency conflict (fallback) on Report client_event_id=%s", body.client_event_id)
+            raise HTTPException(409, "Xung đột dữ liệu: client_event_id báo ngập đã tồn tại với nội dung khác.")
 
 
 @router.get("")
@@ -146,7 +195,7 @@ def list_reports(only_confirmed: bool = False):
                     "id": r["id"],
                     "level": r["level"],
                     "estimated_depth_cm": LEVEL_DEPTH_CM.get(r["level"], 15),
-                    "confirmed": r.get("confirmed", True),
+                    "confirmed": bool(r.get("confirmed", False)),
                     "created_at": r.get("created_at"),
                     "expires_at": r.get("expires_at"),
                 },

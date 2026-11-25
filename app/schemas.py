@@ -46,6 +46,7 @@ class ReportCreate(BaseModel):
     level: Literal["light", "medium", "heavy"]
     user_id: Optional[int] = None
     photo_url: Optional[str] = Field(default=None, max_length=500)
+    client_event_id: Optional[str] = Field(default=None, min_length=8, max_length=100)
 
 
 class ReportClear(BaseModel):
@@ -96,13 +97,32 @@ class ShelterCreate(BaseModel):
 class SOSCreate(BaseModel):
     contact_name: str = Field(min_length=1, max_length=100)
     phone: str = Field(min_length=8, max_length=20)
-    lng: float = Field(ge=-180, le=180)
-    lat: float = Field(ge=-90, le=90)
+    lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    location_source: Literal["gps", "manual", "approximate", "unknown"] = "manual"
+    location_accuracy_m: Optional[float] = Field(default=None, ge=0.0, le=100000.0)
+    location_captured_at: Optional[str] = Field(default=None, max_length=64)
+    location_confirmed: bool = False
+    location_description: Optional[str] = Field(default=None, max_length=300)
+    location_landmark: Optional[str] = Field(default=None, max_length=200)
     people_count: int = Field(default=1, ge=1, le=100)
     has_elderly_or_children: bool = False
     water_level_cm: float = Field(default=0.0, ge=0.0, le=500.0)
     priority: Literal["low", "medium", "high", "critical"] = "high"
     notes: Optional[str] = Field(default=None, max_length=500)
+    client_event_id: Optional[str] = Field(default=None, min_length=8, max_length=100)
+
+    @model_validator(mode="after")
+    def validate_location_or_description(self):
+        if (self.lng is None) != (self.lat is None):
+            raise ValueError("Phải gửi cả lng và lat cùng nhau (hoặc cả hai là null)")
+        if self.lng is None and self.lat is None:
+            desc = (self.location_description or "").strip()
+            landmark = (self.location_landmark or "").strip()
+            notes = (self.notes or "").strip()
+            if len(desc) < 3 and len(landmark) < 3 and len(notes) < 3:
+                raise ValueError("Khi không có tọa độ GPS, cần nhập mô tả địa điểm hoặc điểm mốc (tối thiểu 3 ký tự)")
+        return self
 
 
 class SOSStatusUpdate(BaseModel):
