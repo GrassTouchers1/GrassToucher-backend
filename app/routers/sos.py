@@ -3,13 +3,18 @@ Router Phát Tín Hiệu Cứu Hộ Khẩn Cấp (1-Click Community SOS).
 Cho phép người dân gửi vị trí ngập sâu bị cô lập, số người cần cứu hộ và ưu tiên trợ giúp.
 """
 from datetime import datetime, timedelta, timezone
+import base64
 import hashlib
 import json
 import logging
+import re
 import secrets
 import time
 from typing import Dict, List, Optional
 import psycopg
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from ..db import get_db_connection
@@ -127,6 +132,12 @@ def _to_feature(r: dict) -> dict:
             "notes": r.get("notes"),
             "client_event_id": r.get("client_event_id"),
             "idempotent_replay": bool(r.get("idempotent_replay", False)),
+            "deduplicated": bool(r.get("deduplicated", r.get("idempotent_replay", False))),
+            "ingest_channel": r.get("ingest_channel") or "direct_online",
+            "hop_count": int(r.get("hop_count") or 0),
+            "signature_verified": bool(r.get("signature_verified", False)),
+            "origin_created_at": r.get("origin_created_at"),
+            "relayed_at": r.get("relayed_at"),
             **({"tracking_token": r["tracking_token"]} if r.get("tracking_token") else {}),
             "created_at": str(r.get("created_at")),
             "updated_at": str(r.get("updated_at")),
@@ -364,9 +375,93 @@ def revoke_sos_tracking_token(tracking_token: str):
     return {"revoked": True}
 
 
+def _b64url_to_int(val: str) -> int:
+    padded = val + "=" * ((4 - len(val) % 4) % 4)
+    return int.from_bytes(base64.urlsafe_b64decode(padded.encode("ascii")), "big")
+
+
+def _verify_relay_integrity_and_signature(packet: dict) -> bool:
+    """Xác thực SHA-256 và chữ ký ECDSA-P256 nếu gói tin có kèm metadata bảo mật."""
+    # 1. Xác thực SHA-256
+    integ = packet.get("integrity_metadata") or {}
+    provided_hash = packet.get("payload_sha256") or integ.get("content_hash")
+    if provided_hash:
+        if integ.get("content_hash"):
+            core_obj = {
+                "message_id": packet.get("message_id"),
+                "client_event_id": packet.get("client_event_id"),
+                "origin_device_id": packet.get("origin_device_id"),
+                "created_at": packet.get("created_at"),
+                "expires_at": packet.get("expires_at"),
+                "location": packet.get("location"),
+                "location_source": packet.get("location_source"),
+                "payload": packet.get("payload"),
+            }
+            expected = hashlib.sha256(
+                json.dumps(core_obj, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
+        else:
+            expected = hashlib.sha256(
+                json.dumps(packet.get("payload"), sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
+        if str(provided_hash).lower() != expected.lower():
+            raise HTTPException(422, "Gói tin Relay không khớp mã băm toàn vẹn SHA-256.")
+
+    # 2. Xác thực ECDSA-P256
+    auth = packet.get("authentication_metadata") or {}
+    sig_b64 = packet.get("signature") or auth.get("signature")
+    pub_jwk = packet.get("public_key") or auth.get("public_key_jwk")
+    scheme = auth.get("scheme") or ("ECDSA-P256" if (sig_b64 and pub_jwk) else "NONE")
+    if scheme == "ECDSA-P256" and sig_b64 and pub_jwk:
+        try:
+            if isinstance(pub_jwk, str):
+                pub_jwk = json.loads(pub_jwk)
+            x = _b64url_to_int(pub_jwk["x"])
+            y = _b64url_to_int(pub_jwk["y"])
+            pub_key = ec.EllipticCurvePublicNumbers(x, y, ec.SECP256R1()).public_key()
+            sig_raw = base64.b64decode(sig_b64)
+            if len(sig_raw) == 64:
+                r_int = int.from_bytes(sig_raw[:32], "big")
+                s_int = int.from_bytes(sig_raw[32:], "big")
+                der_sig = encode_dss_signature(r_int, s_int)
+            else:
+                der_sig = sig_raw
+            signed_msg = str(provided_hash).encode("utf-8") if provided_hash else json.dumps(
+                packet.get("payload"), sort_keys=True, ensure_ascii=False, separators=(",", ":")
+            ).encode("utf-8")
+            pub_key.verify(der_sig, signed_msg, ec.ECDSA(hashes.SHA256()))
+            return True
+        except Exception:
+            raise HTTPException(422, "Chữ ký xác thực ECDSA-P256 của gói tin Relay không hợp lệ.")
+    return bool(provided_hash)
+
+
+def _create_sos_with_metadata(body: SOSCreate, extra_meta: dict) -> dict:
+    payload_hash = compute_sos_payload_hash(body) if body.client_event_id else None
+    raw_tracking_token = secrets.token_urlsafe(24)
+    token_hash = _hash_tracking_token(raw_tracking_token)
+    token_expires_iso = (datetime.now(timezone.utc) + timedelta(days=TRACKING_TOKEN_TTL_DAYS)).isoformat()
+
+    fb_data = body.model_dump()
+    if payload_hash:
+        fb_data["payload_hash"] = payload_hash
+    fb_data["tracking_token_hash"] = token_hash
+    fb_data["tracking_token_expires_at"] = token_expires_iso
+    fb_data["tracking_token_revoked"] = False
+    fb_data.update(extra_meta)
+
+    try:
+        saved = save_fallback_sos(fb_data)
+    except IdempotencyConflictError as exc:
+        raise HTTPException(409, str(exc))
+    if not saved.get("idempotent_replay") and not saved.get("deduplicated"):
+        saved["tracking_token"] = raw_tracking_token
+    return _to_feature(saved)
+
+
 @router.post("/relay", status_code=201)
 def receive_relayed_sos(packet: dict):
-    """Tiếp nhận gói SOS chuyển tiếp thủ công từ thiết bị trung gian và chống trùng theo client_event_id."""
+    """Tiếp nhận gói SOS chuyển tiếp (DTN Relay), xác thực SHA-256/ECDSA-P256 và chống trùng client_event_id."""
     if not isinstance(packet, dict):
         raise HTTPException(400, "Gói tin Relay không hợp lệ.")
     client_event_id = packet.get("client_event_id")
@@ -387,20 +482,25 @@ def receive_relayed_sos(packet: dict):
             raise HTTPException(422, "Định dạng expires_at không hợp lệ.")
 
     hop = int(packet.get("hop_count") or 0)
-    max_hops = int(packet.get("max_hops") or 3)
+    max_hops = int(packet.get("max_hops") or 5)
     if hop > max_hops:
         raise HTTPException(422, "Gói tin Relay vượt quá số lần chuyển tiếp cho phép.")
 
+    sig_verified = _verify_relay_integrity_and_signature(packet)
+
     loc = packet.get("location") or {}
     pl = packet.get("payload") or {}
+    relay_hops = packet.get("relay_hops") or packet.get("relay_history") or []
+    raw_phone = str(pl.get("contact_phone_masked") or "0000000000")
+    safe_phone = raw_phone if len(raw_phone) >= 8 else f"REL-{raw_phone}".ljust(8, "0")
     body = SOSCreate(
         contact_name=f"Relay ({packet.get('origin_device_id', 'unknown')})",
-        phone="0000000000",
-        lng=loc.get("lng"),
-        lat=loc.get("lat"),
+        phone=safe_phone,
+        lng=loc.get("lng") if loc.get("lng") is not None else pl.get("lng"),
+        lat=loc.get("lat") if loc.get("lat") is not None else pl.get("lat"),
         location_source=packet.get("location_source") or "unknown",
         location_confirmed=False,
-        location_description=loc.get("location_description") or "SOS chuyển tiếp qua thiết bị trung gian",
+        location_description=loc.get("location_description") or pl.get("location_description") or "SOS chuyển tiếp qua thiết bị trung gian",
         location_landmark=loc.get("location_landmark"),
         people_count=int(pl.get("people_count") or 1),
         has_elderly_or_children=bool(pl.get("has_elderly_or_children")),
@@ -409,7 +509,110 @@ def receive_relayed_sos(packet: dict):
         notes=pl.get("notes") or f"Relayed hop={hop}",
         client_event_id=str(client_event_id),
     )
-    return create_sos_beacon(body)
+    return _create_sos_with_metadata(
+        body,
+        {
+            "ingest_channel": "dtn_relay",
+            "hop_count": hop,
+            "signature_verified": sig_verified,
+            "origin_created_at": packet.get("created_at"),
+            "relayed_at": datetime.now(timezone.utc).isoformat(),
+            "relay_hops": relay_hops,
+        },
+    )
+
+
+@router.post("/gateway/inbound", status_code=201)
+def receive_gateway_inbound_sos(body: dict):
+    """Tiếp nhận khung nén vệ tinh (NS1|...) hoặc tin nhắn SMS 2G chuẩn hóa kèm Auto-Triage."""
+    if not isinstance(body, dict):
+        raise HTTPException(400, "Dữ liệu gateway không hợp lệ.")
+
+    compact_frame = str(body.get("compact_frame") or "").strip()
+    sms_text = str(body.get("sms_text") or "").strip()
+    simulated = bool(body.get("simulated", False))
+
+    lat_val = None
+    lng_val = None
+    people_count = 1
+    water_level_cm = 0.0
+    frame_prio = "high"
+    short_id = ""
+    ingest_channel = "satellite_simulated" if simulated else "satellite"
+
+    if compact_frame:
+        parts = compact_frame.split("|")
+        if len(parts) != 7 or parts[0] != "NS1":
+            raise HTTPException(422, "Khung nén vệ tinh không đúng định dạng NS1.")
+        core_body = "|".join(parts[:6])
+        crc = 0
+        for ch in core_body:
+            crc = (crc ^ ord(ch)) & 0xFF
+        expected_crc = f"{crc:02X}"
+        if parts[6].upper() != expected_crc:
+            raise HTTPException(422, "Sai checksum khung nén vệ tinh.")
+        if parts[1] != "NOGPS" and "," in parts[1]:
+            lat_s, lng_s = parts[1].split(",", 1)
+            lat_val, lng_val = float(lat_s), float(lng_s)
+        people_count = max(1, int(parts[2]))
+        water_level_cm = max(0.0, float(parts[3]))
+        prio_rev = {"C": "critical", "H": "high", "M": "medium", "L": "low"}
+        frame_prio = prio_rev.get(parts[4].upper(), "high")
+        short_id = parts[5]
+    elif sms_text:
+        ingest_channel = "sms_2g"
+        m_coord = re.search(r"(-?\d+\.\d+),(-?\d+\.\d+)", sms_text)
+        if m_coord:
+            lat_val, lng_val = float(m_coord.group(1)), float(m_coord.group(2))
+        m_ppl = re.search(r"(\d+)\s*nguoi", sms_text, re.IGNORECASE)
+        if m_ppl:
+            people_count = max(1, int(m_ppl.group(1)))
+        m_depth = re.search(r"(\d+)\s*cm", sms_text, re.IGNORECASE)
+        if m_depth:
+            water_level_cm = max(0.0, float(m_depth.group(1)))
+        short_id = sms_text.split()[-1] if sms_text.split() else "SMS"
+    else:
+        raise HTTPException(422, "Thiếu compact_frame hoặc sms_text.")
+
+    # Auto-Triage theo mực nước + ưu tiên khung
+    if water_level_cm >= 200 or frame_prio == "critical":
+        triaged_prio = "critical"
+    elif water_level_cm >= 100 or frame_prio == "high":
+        triaged_prio = "high"
+    else:
+        triaged_prio = "medium"
+
+    client_event_id = str(body.get("client_event_id") or f"gw-{ingest_channel}-{short_id}-{int(time.time() * 1000)}")
+    if len(client_event_id) < 8:
+        client_event_id = f"gw-{client_event_id}-0000"
+
+    sos_body = SOSCreate(
+        contact_name=f"Gateway ({ingest_channel})",
+        phone="0000000000",
+        lng=lng_val,
+        lat=lat_val,
+        location_source="approximate" if lat_val is not None else "unknown",
+        location_confirmed=False,
+        location_description=f"Tiếp nhận qua {ingest_channel} ({short_id})" if lat_val is None else None,
+        people_count=people_count,
+        has_elderly_or_children=bool(body.get("has_elderly_or_children", False)),
+        water_level_cm=water_level_cm,
+        priority=triaged_prio,
+        notes=f"[{ingest_channel.upper()}] {compact_frame or sms_text}",
+        client_event_id=client_event_id,
+    )
+    feature = _create_sos_with_metadata(
+        sos_body,
+        {
+            "ingest_channel": ingest_channel,
+            "hop_count": 0,
+            "signature_verified": bool(compact_frame),
+            "relayed_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    feature["gateway_ref"] = f"GW-{feature['properties']['id']}"
+    feature["simulated"] = simulated
+    return feature
 
 
 @router.patch("/{sos_id}/status")
